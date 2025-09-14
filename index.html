@@ -5,62 +5,82 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>מעקב נגעי עור – ABCDE</title>
 <style>
-  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.5;margin:0}
-  header{background:#fff;padding:12px 16px;border-bottom:1px solid #ddd;position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center}
+  :root{
+    --bg:#ffffff;--fg:#111;--muted:#666;--accent:#0a7cff;--card:#f6f7f9;--border:#e6e8eb
+  }
+  *{box-sizing:border-box}
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.5;margin:0;background:var(--bg);color:var(--fg)}
+  header{background:#fff;padding:12px 16px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center;gap:12px}
   h1{margin:0;font-size:1.1rem}
-  main{padding:16px;max-width:800px;margin:auto}
-  .card{background:#f9f9f9;border:1px solid #ddd;border-radius:12px;padding:14px;margin:12px 0}
+  main{padding:16px;max-width:840px;margin:auto}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin:12px 0}
   label{font-weight:600;display:block;margin-top:8px}
   input,textarea,button,select{font-size:1rem}
-  input[type="date"],input[type="text"],textarea{width:100%;padding:8px;border:1px solid #ccc;border-radius:8px;box-sizing:border-box}
-  textarea{min-height:80px}
-  .abcde-item{background:#fff;border:1px solid #ddd;border-radius:10px;padding:10px;margin-top:8px}
-  .abcde-options label{margin-right:12px}
+  input[type="date"],input[type="text"],textarea{width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;background:#fff}
+  textarea{min-height:80px;resize:vertical}
+  .abcde-item{background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px;margin-top:8px}
+  .abcde-options{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px}
   .actions{margin-top:12px;display:flex;gap:10px;flex-wrap:wrap}
-  button{padding:10px 14px;border:none;border-radius:8px;cursor:pointer}
-  button.primary{background:#0a7cff;color:#fff;font-weight:700}
+  button{padding:10px 14px;border:none;border-radius:10px;cursor:pointer}
+  button.primary{background:var(--accent);color:#fff;font-weight:700}
   button.secondary{background:#e9eefb;color:#0a2a5f}
-  .tiny{font-size:.85rem;color:#555}
-  .entry{background:#fff;border:1px solid #ddd;border-radius:10px;padding:10px;margin-top:10px}
-  .badges{margin:4px 0;font-size:.85rem;color:#333}
+  .tiny{font-size:.85rem;color:var(--muted)}
+  .entry{background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;margin-top:10px}
+  .entry h3{margin:.2rem 0;font-size:1rem}
+  .badges{margin:4px 0;font-size:.9rem;color:#333}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .spacer{flex:1}
+  .danger{background:#ffe8e8;color:#842029}
+  .link-btn{display:inline-block;text-decoration:none;padding:8px 12px;border:1px solid var(--border);border-radius:10px}
 </style>
 </head>
 <body>
 <header>
   <h1 id="title">מעקב נגעי עור – ABCDE</h1>
-  <select id="langSwitcher">
+  <select id="langSwitcher" aria-label="Language">
     <option value="he">עברית</option>
     <option value="ru">Русский</option>
   </select>
 </header>
+
 <main>
   <section class="card">
-    <p class="tiny" id="note"></p>
+    <p class="tiny" id="note">המידע נשמר לוקאלית בלבד במכשיר שלך.</p>
+
     <form id="entryForm">
-      <label for="date" id="lblDate"></label>
+      <label for="date" id="lblDate">תאריך</label>
       <input id="date" name="date" type="date" required>
-      <label for="title" id="lblTitle"></label>
-      <input id="title" name="title" type="text">
-      <label for="notes" id="lblNotes"></label>
-      <textarea id="notes" name="notes"></textarea>
-      <label for="photo" id="lblPhoto"></label>
-      <!-- removed capture to allow gallery OR camera -->
+
+      <label for="title" id="lblTitle">כותרת קצרה (אופציונלי)</label>
+      <input id="title" name="title" type="text" placeholder="למשל: תיעוד ראשון">
+
+      <label for="notes" id="lblNotes">תיאור/תסמינים</label>
+      <textarea id="notes" name="notes" placeholder="שינויים, כאב/גרד, דימום, מיקום..."></textarea>
+
+      <label for="photo" id="lblPhoto">תמונה (מומלץ)</label>
+      <!-- allow user to choose camera or gallery (no capture attr) -->
       <input id="photo" name="photo" type="file" accept="image/*">
-      
+
       <div id="abcdeSection"></div>
 
+      <!-- Conditional extra notes for E = changes -->
+      <div id="changesWrap" style="display:none;">
+        <label for="changesText" id="lblChangesText">פרטי השינויים</label>
+        <textarea id="changesText" name="changesText" placeholder="מה השתנה? גודל, צבע, צורה, דימום..."></textarea>
+      </div>
+
       <div class="actions">
-        <button type="submit" class="primary" id="btnAdd"></button>
-        <button type="button" class="secondary" id="exportBtn"></button>
-        <button type="button" class="secondary" id="importBtn"></button>
+        <button type="submit" class="primary" id="btnAdd">הוסף/י תיעוד</button>
+        <button type="button" class="secondary" id="exportBtn">ייצוא גיבוי</button>
+        <button type="button" class="secondary" id="importBtn">ייבוא</button>
         <input type="file" id="importFile" accept="application/json" hidden>
-        <button type="button" class="secondary" id="clearBtn"></button>
+        <button type="button" class="secondary" id="clearBtn">איפוס הכל</button>
       </div>
     </form>
   </section>
 
   <section class="card">
-    <h2 id="myRecords"></h2>
+    <h2 id="myRecords">הרשומות שלי</h2>
     <div id="list"></div>
   </section>
 </main>
@@ -75,11 +95,16 @@ const translations = {
     lblTitle:"כותרת קצרה (אופציונלי)",
     lblNotes:"תיאור/תסמינים",
     lblPhoto:"תמונה (מומלץ)",
+    lblChangesText:"פרטי השינויים",
     btnAdd:"הוסף/י תיעוד",
     btnExport:"ייצוא גיבוי",
     btnImport:"ייבוא",
     btnClear:"איפוס הכל",
     myRecords:"הרשומות שלי",
+    openImage:"📷 פתח תמונה",
+    delete:"מחיקה",
+    confirmDelete:"למחוק את הרשומה?",
+    noRecords:"אין רשומות.",
     abcde:{
       A:["אסימטריה","סימטרי","לא סימטרי"],
       B:["גבול","גבולות ברורים","גבול לא אחיד/משונן"],
@@ -95,11 +120,16 @@ const translations = {
     lblTitle:"Краткий заголовок (опционально)",
     lblNotes:"Описание/симптомы",
     lblPhoto:"Фото (рекомендуется)",
+    lblChangesText:"Подробности изменений",
     btnAdd:"Добавить запись",
     btnExport:"Экспорт резервной копии",
     btnImport:"Импорт",
     btnClear:"Очистить все",
     myRecords:"Мои записи",
+    openImage:"📷 Открыть фото",
+    delete:"Удалить",
+    confirmDelete:"Удалить запись?",
+    noRecords:"Записей нет.",
     abcde:{
       A:["Асимметрия","Симметричное","Асимметричное"],
       B:["Граница","Чёткая граница","Нечёткая/неровная"],
@@ -111,6 +141,9 @@ const translations = {
 };
 
 // ================= Helpers =================
+const LS_KEY_ENTRIES = "skin_entries";
+const LS_KEY_LANG = "skin_lang";
+
 function readFileAsDataURL(file){
   return new Promise((resolve,reject)=>{
     const r=new FileReader();
@@ -120,112 +153,302 @@ function readFileAsDataURL(file){
   });
 }
 
-function saveEntries(entries){
-  localStorage.setItem("skin_entries",JSON.stringify(entries));
-}
+function saveEntries(entries){ localStorage.setItem(LS_KEY_ENTRIES, JSON.stringify(entries)); }
 function loadEntries(){
-  try{return JSON.parse(localStorage.getItem("skin_entries")||"[]");}catch(e){return []}
+  try { return JSON.parse(localStorage.getItem(LS_KEY_ENTRIES) || "[]"); }
+  catch(e){ return []; }
 }
+
 function summarizeABCDE(entry){
-  return ["A","B","C","D","E"].map(k=>k+": "+(entry.ABCDE[k]||"?")).join(" | ");
+  return ["A","B","C","D","E"].map(k=>k+": "+(entry.ABCDE?.[k]||"?")).join(" | ");
 }
+
+// Delete entry by id
+function deleteEntry(id){
+  const entries = loadEntries().filter(e => e.id !== id);
+  saveEntries(entries);
+  renderList();
+}
+
+function currentLang(){ return document.getElementById("langSwitcher").value || "he"; }
+
 function renderList(){
-  const list=document.getElementById("list");
-  const entries=loadEntries().sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
-  list.innerHTML="";
-  if(entries.length===0){list.innerHTML="<p class='tiny'>אין רשומות.</p>";return;}
+  const t = translations[currentLang()];
+  const list = document.getElementById("list");
+  const entries = loadEntries().sort((a,b)=> (b.createdAt||0)-(a.createdAt||0));
+  list.innerHTML = "";
+
+  if(entries.length===0){
+    list.innerHTML = `<p class="tiny">${t.noRecords}</p>`;
+    return;
+  }
+
   for(const e of entries){
-    const div=document.createElement("div");div.className="entry";
-    const h=document.createElement("h3");
-    h.textContent=(e.date||"")+" – "+(e.title||"");
+    const div = document.createElement("div");
+    div.className = "entry";
+
+    const h = document.createElement("h3");
+    h.textContent = `${e.date || ""}${e.title ? " – " + e.title : ""}`;
     div.appendChild(h);
-    const badges=document.createElement("div");badges.className="badges";
-    badges.textContent=summarizeABCDE(e);
+
+    const badges = document.createElement("div");
+    badges.className = "badges";
+    badges.textContent = summarizeABCDE(e);
     div.appendChild(badges);
-    if(e.notes){const p=document.createElement("p");p.textContent="תיאור: "+e.notes;div.appendChild(p);}
-    if(e.image){const a=document.createElement("a");a.href=e.image;a.target="_blank";a.textContent="📷 פתח תמונה";div.appendChild(a);}
+
+    if(e.notes){
+      const p = document.createElement("p");
+      p.textContent = (translations[currentLang()].lblNotes || "Notes") + ": " + e.notes;
+      div.appendChild(p);
+    }
+
+    if(e.changesText){
+      const p2 = document.createElement("p");
+      p2.textContent = (translations[currentLang()].lblChangesText || "Changes") + ": " + e.changesText;
+      div.appendChild(p2);
+    }
+
+    const row = document.createElement("div");
+    row.className = "row";
+
+    if(e.image){
+      const a = document.createElement("a");
+      a.href = e.image;
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.className = "link-btn";
+      a.textContent = t.openImage;
+      row.appendChild(a);
+    }
+
+    row.appendChild(Object.assign(document.createElement("div"),{className:"spacer"}));
+
+    const delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.className = "danger";
+    delBtn.textContent = t.delete;
+    delBtn.addEventListener("click", ()=>{
+      if(confirm(t.confirmDelete)){ deleteEntry(e.id); }
+    });
+    row.appendChild(delBtn);
+
+    div.appendChild(row);
     list.appendChild(div);
   }
 }
 
-// ================= Form Handling =================
-document.getElementById("entryForm").addEventListener("submit",async ev=>{
-  ev.preventDefault();
-  const form=ev.currentTarget;
-  const date=form.date.value;
-  const title=form.title.value.trim();
-  const notes=form.notes.value.trim();
-  const ABCDE={};
+// ================= ABCDE dynamic rendering =================
+function getFormSelections(){
+  // Capture current selections to preserve when switching language
+  const sel = {};
   ["A","B","C","D","E"].forEach(k=>{
-    const v=form.querySelector(`input[name=${k}]:checked`);
-    if(v) ABCDE[k]=v.value;
+    const checked = document.querySelector(`#entryForm input[name="${k}"]:checked`);
+    if(checked) sel[k] = checked.value;
   });
-  let image="";
-  if(form.photo.files && form.photo.files[0]){
-    try{image=await readFileAsDataURL(form.photo.files[0]);}catch(e){}
-  }
-  const entry={id:Date.now()+"",date,title,notes,ABCDE,image,createdAt:Date.now()};
-  const entries=loadEntries();entries.push(entry);saveEntries(entries);
-  renderList();form.reset();
-  ["A","B","C","D","E"].forEach(k=>{
-    const el=form.querySelector(`input[name=${k}]`);if(el)el.required=true;
-  });
-});
+  sel.date = document.getElementById("date").value;
+  sel.title = document.getElementById("title").value;
+  sel.notes = document.getElementById("notes").value;
+  sel.changesText = document.getElementById("changesText")?.value || "";
+  return sel;
+}
 
-// Export/Import/Clear
-document.getElementById("exportBtn").addEventListener("click",()=>{
-  const data=JSON.stringify(loadEntries(),null,2);
-  const blob=new Blob([data],{type:"application/json"});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement("a");a.href=url;a.download="skin-entries.json";
-  a.click();URL.revokeObjectURL(url);
-});
-document.getElementById("importBtn").addEventListener("click",()=>{document.getElementById("importFile").click();});
-document.getElementById("importFile").addEventListener("change",async e=>{
-  const f=e.target.files[0];if(!f)return;const txt=await f.text();
-  try{const arr=JSON.parse(txt);if(Array.isArray(arr)){saveEntries(arr);renderList();}}catch{}
-});
-document.getElementById("clearBtn").addEventListener("click",()=>{if(confirm("למחוק הכל?")){localStorage.removeItem("skin_entries");renderList();}});
+function restoreFormSelections(sel){
+  document.getElementById("date").value = sel.date || new Date().toISOString().slice(0,10);
+  document.getElementById("title").value = sel.title || "";
+  document.getElementById("notes").value = sel.notes || "";
+  const Echange = (sel.E && isChangeValue(sel.E)) ? "show" : "hide";
+  document.getElementById("changesText").value = sel.changesText || "";
+  toggleChangesBox(Echange === "show");
+}
 
-// ================= Language Switching =================
-function renderLang(lang){
-  const t=translations[lang];
-  document.documentElement.lang=lang==="he"?"he":"ru";
-  document.documentElement.dir=lang==="he"?"rtl":"ltr";
-  document.getElementById("title").textContent=t.title;
-  document.getElementById("note").textContent=t.note;
-  document.getElementById("lblDate").textContent=t.lblDate;
-  document.getElementById("lblTitle").textContent=t.lblTitle;
-  document.getElementById("lblNotes").textContent=t.lblNotes;
-  document.getElementById("lblPhoto").textContent=t.lblPhoto;
-  document.getElementById("btnAdd").textContent=t.btnAdd;
-  document.getElementById("exportBtn").textContent=t.btnExport;
-  document.getElementById("importBtn").textContent=t.btnImport;
-  document.getElementById("clearBtn").textContent=t.btnClear;
-  document.getElementById("myRecords").textContent=t.myRecords;
-  const sec=document.getElementById("abcdeSection");sec.innerHTML="";
-  for(const k in t.abcde){
-    const [title,opt1,opt2]=t.abcde[k];
-    const fs=document.createElement("fieldset");fs.className="abcde-item";
-    const lg=document.createElement("legend");lg.textContent=k+" – "+title;fs.appendChild(lg);
-    [opt1,opt2].forEach((opt,i)=>{
-      const label=document.createElement("label");
-      const r=document.createElement("input");r.type="radio";r.name=k;r.value=opt;if(i===0)r.required=true;
-      label.appendChild(r);label.append(" "+opt);fs.appendChild(label);
-    });
+function isChangeValue(v){
+  // Accept both languages values for "changes"
+  return ["יש שינוי","Есть изменения"].includes(v);
+}
+
+function buildABCDE(lang){
+  const t = translations[lang];
+  const sec = document.getElementById("abcdeSection");
+  sec.innerHTML = "";
+
+  for(const k of ["A","B","C","D","E"]){
+    const [title,opt1,opt2] = t.abcde[k];
+    const fs = document.createElement("fieldset");
+    fs.className = "abcde-item";
+
+    const lg = document.createElement("legend");
+    lg.textContent = `${k} – ${title}`;
+    fs.appendChild(lg);
+
+    const opts = document.createElement("div");
+    opts.className = "abcde-options";
+
+    // radio 1
+    const l1 = document.createElement("label");
+    const r1 = document.createElement("input");
+    r1.type = "radio"; r1.name = k; r1.value = opt1; r1.required = true;
+    l1.appendChild(r1); l1.append(" " + opt1);
+    opts.appendChild(l1);
+
+    // radio 2
+    const l2 = document.createElement("label");
+    const r2 = document.createElement("input");
+    r2.type = "radio"; r2.name = k; r2.value = opt2;
+    l2.appendChild(r2); l2.append(" " + opt2);
+    opts.appendChild(l2);
+
+    fs.appendChild(opts);
     sec.appendChild(fs);
   }
+
+  // attach change listener for E radios to toggle extra textbox
+  sec.addEventListener("change", (e)=>{
+    if(e.target && e.target.name === "E"){
+      toggleChangesBox(isChangeValue(e.target.value));
+    }
+  }, { once:false });
 }
-document.getElementById("langSwitcher").addEventListener("change",e=>{
-  renderLang(e.target.value);localStorage.setItem("skin_lang",e.target.value);
+
+function toggleChangesBox(show){
+  const wrap = document.getElementById("changesWrap");
+  wrap.style.display = show ? "block" : "none";
+}
+
+// ================= Form Handling =================
+document.getElementById("entryForm").addEventListener("submit", async (ev)=>{
+  ev.preventDefault();
+  const form = ev.currentTarget;
+  const date = form.date.value || new Date().toISOString().slice(0,10);
+  const title = form.title.value.trim();
+  const notes = form.notes.value.trim();
+  const ABCDE = {};
+  ["A","B","C","D","E"].forEach(k=>{
+    const v = form.querySelector(`input[name="${k}"]:checked`);
+    if(v) ABCDE[k] = v.value;
+  });
+
+  // Extra changes text only if E == "changes"
+  let changesText = "";
+  const eVal = ABCDE.E || "";
+  if(isChangeValue(eVal)){
+    changesText = (document.getElementById("changesText").value || "").trim();
+  }
+
+  let image = "";
+  if(form.photo.files && form.photo.files[0]){
+    try { image = await readFileAsDataURL(form.photo.files[0]); } catch(e){}
+  }
+
+  const entry = {
+    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+    date, title, notes, ABCDE, image, changesText,
+    createdAt: Date.now()
+  };
+
+  const entries = loadEntries();
+  entries.push(entry);
+  saveEntries(entries);
+
+  renderList();
+  form.reset();
+  // Rebuild ABCDE (to restore required flags after reset) and hide changes box
+  buildABCDE(currentLang());
+  toggleChangesBox(false);
+  document.getElementById("date").value = new Date().toISOString().slice(0,10);
 });
 
-// Init
-const savedLang=localStorage.getItem("skin_lang")||"he";
-document.getElementById("langSwitcher").value=savedLang;
-renderLang(savedLang);
-document.getElementById("date").value=new Date().toISOString().slice(0,10);
+// Export / Import / Clear
+document.getElementById("exportBtn").addEventListener("click", ()=>{
+  const data = JSON.stringify(loadEntries(), null, 2);
+  const blob = new Blob([data], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "skin-entries.json"; a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById("importBtn").addEventListener("click", ()=>{
+  document.getElementById("importFile").click();
+});
+
+document.getElementById("importFile").addEventListener("change", async (e)=>{
+  const f = e.target.files[0]; if(!f) return;
+  try{
+    const txt = await f.text();
+    const arr = JSON.parse(txt);
+    if(Array.isArray(arr)){ saveEntries(arr); renderList(); }
+  }catch(err){ alert("Import failed"); }
+});
+
+document.getElementById("clearBtn").addEventListener("click", ()=>{
+  const t = translations[currentLang()];
+  if(confirm(t.confirmDelete || "Delete all?")){
+    localStorage.removeItem(LS_KEY_ENTRIES);
+    renderList();
+  }
+});
+
+// ================= Language Switching (preserves inputs) =================
+function applyLanguage(lang){
+  const t = translations[lang];
+
+  document.documentElement.lang = (lang==="he") ? "he" : "ru";
+  document.documentElement.dir  = (lang==="he") ? "rtl" : "ltr";
+
+  document.getElementById("title").textContent = t.title;
+  document.getElementById("note").textContent  = t.note;
+  document.getElementById("lblDate").textContent  = t.lblDate;
+  document.getElementById("lblTitle").textContent = t.lblTitle;
+  document.getElementById("lblNotes").textContent = t.lblNotes;
+  document.getElementById("lblPhoto").textContent = t.lblPhoto;
+  document.getElementById("lblChangesText").textContent = t.lblChangesText;
+  document.getElementById("btnAdd").textContent   = t.btnAdd;
+  document.getElementById("exportBtn").textContent= t.btnExport;
+  document.getElementById("importBtn").textContent= t.btnImport;
+  document.getElementById("clearBtn").textContent = t.btnClear;
+  document.getElementById("myRecords").textContent= t.myRecords;
+
+  // Re-render ABCDE while preserving current selections
+  const sel = getFormSelections();
+  buildABCDE(lang);
+
+  // Re-check saved selections after we rebuilt the radios
+  ["A","B","C","D","E"].forEach(k=>{
+    if(sel[k]){
+      const el = Array.from(document.querySelectorAll(`#entryForm input[name="${k}"]`))
+        .find(r => r.value === sel[k]);
+      if(el){ el.checked = true; }
+    }
+  });
+
+  // Restore other fields & toggle changes box if needed
+  restoreFormSelections(sel);
+
+  // Re-render list (for translated labels in UI)
+  renderList();
+}
+
+document.getElementById("langSwitcher").addEventListener("change", e=>{
+  const lang = e.target.value;
+  localStorage.setItem(LS_KEY_LANG, lang);
+  applyLanguage(lang);
+});
+
+// ================= Init =================
+const savedLang = localStorage.getItem(LS_KEY_LANG) || "he";
+document.getElementById("langSwitcher").value = savedLang;
+buildABCDE(savedLang);
+applyLanguage(savedLang);
+document.getElementById("date").value = new Date().toISOString().slice(0,10);
 renderList();
+
+// Ensure the changes box reacts to initial E selection (if any)
+document.getElementById("abcdeSection").addEventListener("change", (e)=>{
+  if(e.target && e.target.name === "E"){
+    toggleChangesBox(isChangeValue(e.target.value));
+  }
+});
+
 </script>
 </body>
 </html>
