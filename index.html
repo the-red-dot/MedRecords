@@ -8,9 +8,10 @@
   :root{ --bg:#ffffff;--fg:#111;--muted:#666;--accent:#0a7cff;--card:#f6f7f9;--border:#e6e8eb }
   *{box-sizing:border-box}
   body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.5;margin:0;background:var(--bg);color:var(--fg)}
-  header{background:#fff;padding:12px 16px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  header{background:#fff;padding:12px 16px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+  header .right{margin-inline-start:auto;display:flex;gap:8px;align-items:center}
   h1{margin:0;font-size:1.1rem}
-  main{padding:16px;max-width:840px;margin:auto}
+  main{padding:16px;max-width:860px;margin:auto}
   .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin:12px 0}
   label{font-weight:600;display:block;margin-top:8px}
   input,textarea,button,select{font-size:1rem}
@@ -31,20 +32,31 @@
   .danger{background:#ffe8e8;color:#842029}
   .link-btn{display:inline-block;text-decoration:none;padding:8px 12px;border:1px solid var(--border);border-radius:10px}
   .hide{display:none}
+  .status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-inline-end:6px;background:#bbb}
+  .status-ok{background:#29a745}
+  .status-bad{background:#d33}
 </style>
 </head>
 <body>
 <header>
   <h1 id="title">מעקב נגעי עור – ABCDE</h1>
-  <select id="langSwitcher" aria-label="Language">
-    <option value="he">עברית</option>
-    <option value="ru">Русский</option>
-  </select>
+
+  <div class="right">
+    <select id="langSwitcher" aria-label="Language">
+      <option value="he">עברית</option>
+      <option value="ru">Русский</option>
+    </select>
+
+    <button id="btnAnonSignIn" class="secondary">כניסה אנונימית</button>
+    <button id="btnSignOut" class="secondary hide">התנתקות</button>
+
+    <span class="tiny" id="authState"><span class="status-dot"></span> מצב: מנותק</span>
+  </div>
 </header>
 
 <main>
   <section class="card">
-    <p class="tiny" id="note">המידע נשמר בחשבון Supabase הפרטי שלך (עם כניסה אנונימית). התמונות נשמרות באחסון הענן שלך.</p>
+    <p class="tiny" id="note">המידע נשמר בחשבון Supabase שלך (עם כניסה אנונימית). התמונות נשמרות באחסון הענן שלך.</p>
 
     <form id="entryForm">
       <label for="date" id="lblDate">תאריך</label>
@@ -71,8 +83,6 @@
         <button type="button" class="secondary" id="exportDocBtn">ייצוא לדוק (Word)</button>
         <button type="button" class="secondary" id="clearBtn">איפוס הכל (שרת)</button>
       </div>
-
-      <p class="tiny" id="authState">מתחבר...</p>
     </form>
   </section>
 
@@ -85,42 +95,45 @@
 <!-- Supabase JS v2 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-// ===== Supabase config (אל תשתמשו ב-service_role בצד לקוח) =====
+/* ================= Supabase config (client-side) =================
+   IMPORTANT: Use ONLY the anon key here. Do NOT expose the service_role key. */
 const SUPABASE_URL = "https://gcjfkgrohlitqzktgqvd.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdjamZrZ3JvaGxpdHF6a3RncXZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc4NjA2ODEsImV4cCI6MjA3MzQzNjY4MX0.aWha5IHE6lttKC3h8qa3JvKf6uH9OZwAIs_EESNoZig";
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+});
 let currentUser = null;
 
-// ===== תרגומים =====
+/* ================= i18n ================= */
 const translations = {
-  he:{ title:"מעקב נגעי עור – ABCDE", note:"המידע נשמר בחשבון Supabase הפרטי שלך (עם כניסה אנונימית). התמונות נשמרות באחסון הענן שלך.",
+  he:{ title:"מעקב נגעי עור – ABCDE",
+    note:"המידע נשמר בחשבון Supabase שלך (עם כניסה אנונימית). התמונות נשמרות באחסון הענן שלך.",
     lblDate:"תאריך", lblTitle:"כותרת קצרה (אופציונלי)", lblNotes:"תיאור/תסמינים", lblPhoto:"תמונה (מומלץ)",
     lblChangesText:"פרטי השינויים", btnAdd:"הוסף/י תיעוד", exportDoc:"ייצוא לדוק (Word)", btnClear:"איפוס הכל (שרת)",
     myRecords:"הרשומות שלי", openImage:"📷 פתח תמונה", delete:"מחיקה", confirmDelete:"למחוק את הרשומה?",
     confirmDeleteAll:"למחוק את כל הרשומות מהשרת?", noRecords:"אין רשומות.",
+    authUi:{ signin:"כניסה אנונימית", signout:"התנתקות", connecting:"מתחבר...", ready:"מחובר (אנונימי)", off:"מנותק" },
     abcde:{ A:["אסימטריה","סימטרי","לא סימטרי"], B:["גבול","גבולות ברורים","גבול לא אחיד/משונן"],
             C:["צבע","צבע אחיד","מספר צבעים"], D:["קוטר","קטן מ-6 מ\"מ","גדול מ-6 מ\"מ"], E:["שינוי/התפתחות","ללא שינוי","יש שינוי"] },
-    labels:{ date:"תאריך", title:"כותרת", notes:"תיאור/תסמינים", abcde:"סיכום ABCDE", changes:"פרטי השינויים", image:"תמונה" },
-    auth:{ connecting:"מתחבר...", ready:"מחובר (אנונימי)", err:"שגיאת התחברות" }
+    labels:{ date:"תאריך", title:"כותרת", notes:"תיאור/תסמינים", abcde:"סיכום ABCDE", changes:"פרטי השינויים", image:"תמונה" }
   },
-  ru:{ title:"Мониторинг кожных поражений – ABCDE", note:"Данные сохраняются в вашем Supabase (анонимный вход). Фото в облачном хранилище.",
+  ru:{ title:"Мониторинг кожных поражений – ABCDE",
+    note:"Данные сохраняются в вашем Supabase (анонимный вход). Фото в облачном хранилище.",
     lblDate:"Дата", lblTitle:"Краткий заголовок (опционально)", lblNotes:"Описание/симптомы", lblPhoto:"Фото (рекомендуется)",
     lblChangesText:"Подробности изменений", btnAdd:"Добавить запись", exportDoc:"Экспорт в DOC (Word)", btnClear:"Очистить все (сервер)",
     myRecords:"Мои записи", openImage:"📷 Открыть фото", delete:"Удалить", confirmDelete:"Удалить запись?",
     confirmDeleteAll:"Удалить все записи на сервере?", noRecords:"Записей нет.",
+    authUi:{ signin:"Анонимный вход", signout:"Выйти", connecting:"Подключение…", ready:"Подключено (анонимно)", off:"Отключено" },
     abcde:{ A:["Асимметрия","Симметричное","Асимметричное"], B:["Граница","Чёткая граница","Нечёткая/неровная"],
             C:["Цвет","Один цвет","Несколько цветов"], D:["Диаметр","Меньше 6 мм","Больше 6 мм"], E:["Эволюция","Без изменений","Есть изменения"] },
-    labels:{ date:"Дата", title:"Заголовок", notes:"Описание/симптомы", abcde:"Сводка ABCDE", changes:"Подробности изменений", image:"Фото" },
-    auth:{ connecting:"Подключение...", ready:"Подключено (анонимно)", err:"Ошибка входа" }
+    labels:{ date:"Дата", title:"Заголовок", notes:"Описание/симптомы", abcde:"Сводка ABCDE", changes:"Подробности изменений", image:"Фото" }
   }
 };
 function currentLang(){ return document.getElementById("langSwitcher").value || "he"; }
 function t(){ return translations[currentLang()]; }
-
 function escapeHtml(s){return String(s||"").replace(/[&<>"]/g, ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]))}
 
-// ===== ABCDE UI =====
+/* ================= ABCDE UI ================= */
 function isChangeValue(v){ return v && (v === "יש שינוי" || v === "Есть изменения"); }
 function buildABCDE(lang){
   const tr = translations[lang]; const sec = document.getElementById("abcdeSection"); sec.innerHTML="";
@@ -136,43 +149,63 @@ function buildABCDE(lang){
   }
 }
 function summarizeABCDE(entry){
-  return ["A","B","C","D","E"].map(k=>k+": "+(entry.abcde?.[k]||entry.ABCDE?.[k]||"?")).join(" | ");
+  const src = entry.abcde || entry.ABCDE || {};
+  return ["A","B","C","D","E"].map(k=>k+": "+(src[k]||"?")).join(" | ");
 }
 function toggleChangesBox(show){ document.getElementById("changesWrap").classList.toggle("hide", !show); }
 document.addEventListener("change",(e)=>{ if(e.target && e.target.name==="E"){ toggleChangesBox(isChangeValue(e.target.value)); }});
 
-// ===== Auth (Anonymous) =====
-async function ensureAuth(){
-  const note = document.getElementById("authState");
-  note.textContent = t().auth.connecting;
-  let { data:{ session } } = await supabase.auth.getSession();
-  if(!session){
-    const { data, error } = await supabase.auth.signInAnonymously();
-    if(error){ note.textContent = t().auth.err; console.error(error); return; }
-    session = data.session;
+/* ================= Auth (Anonymous) ================= */
+async function updateAuthUi(state, info=""){
+  const el = document.getElementById("authState");
+  const dot = el.querySelector(".status-dot");
+  const btnIn = document.getElementById("btnAnonSignIn");
+  const btnOut = document.getElementById("btnSignOut");
+  if(state==="on"){
+    el.innerHTML = `<span class="status-dot status-ok"></span> ${t().authUi.ready} • ${info}`;
+    btnIn.classList.add("hide"); btnOut.classList.remove("hide");
+  }else if(state==="connecting"){
+    el.innerHTML = `<span class="status-dot"></span> ${t().authUi.connecting}`;
+    btnIn.classList.remove("hide"); btnOut.classList.add("hide");
+  }else{
+    el.innerHTML = `<span class="status-dot"></span> ${t().authUi.off}`;
+    btnIn.classList.remove("hide"); btnOut.classList.add("hide");
   }
-  currentUser = session.user;
-  note.textContent = t().auth.ready + " • " + currentUser.id.slice(0,8);
 }
-supabase.auth.onAuthStateChange((_evt, session)=>{ if(session){ currentUser=session.user; } });
+async function signInAnon(){
+  await updateAuthUi("connecting");
+  const { data, error } = await supabase.auth.signInAnonymously();
+  if(error){ await updateAuthUi("off"); alert("Auth error"); return; }
+  currentUser = data.session.user;
+  await updateAuthUi("on", currentUser.id.slice(0,8));
+  await renderList();
+}
+async function loadSession(){
+  await updateAuthUi("connecting");
+  const { data:{ session } } = await supabase.auth.getSession();
+  if(session){ currentUser = session.user; await updateAuthUi("on", currentUser.id.slice(0,8)); }
+  else { currentUser = null; await updateAuthUi("off"); }
+}
+document.getElementById("btnAnonSignIn").addEventListener("click", signInAnon);
+document.getElementById("btnSignOut").addEventListener("click", async ()=>{
+  await supabase.auth.signOut(); currentUser=null; await updateAuthUi("off"); document.getElementById("list").innerHTML=""; 
+});
 
-// ===== Storage upload =====
+/* ================= Storage upload ================= */
 async function uploadImageIfAny(file, entryId){
   if(!file) return {path:null, url:null};
-  const path = `${currentUser.id}/${entryId}-${Date.now()}.${(file.type.split("/")[1]||"jpg").toLowerCase()}`;
-  const { data, error } = await supabase.storage.from("lesion-photos").upload(path, file, { upsert:false, contentType:file.type });
+  const ext = (file.type.split("/")[1]||"jpg").toLowerCase();
+  const path = `${currentUser.id}/${entryId}-${Date.now()}.${ext}`;
+  const { error } = await supabase.storage.from("lesion-photos").upload(path, file, { upsert:false, contentType:file.type });
   if(error){ console.warn("storage upload error", error); return {path:null, url:null}; }
-  // bucket public=true → get public URL
   const { data:pub } = supabase.storage.from("lesion-photos").getPublicUrl(path);
   return { path, url: pub.publicUrl };
 }
 
-// ===== DB ops =====
+/* ================= DB ops ================= */
 async function fetchEntries(){
-  const { data, error } = await supabase
-    .from("entries")
-    .select("*")
-    .order("created_at", { ascending:false });
+  if(!currentUser) return [];
+  const { data, error } = await supabase.from("entries").select("*").order("created_at",{ascending:false});
   if(error){ console.error(error); return []; }
   return data || [];
 }
@@ -184,51 +217,43 @@ async function insertEntry(e){
 async function deleteEntryServer(id, image_path){
   const { error } = await supabase.from("entries").delete().eq("id", id);
   if(error){ alert("Delete failed"); return; }
-  if(image_path){
-    await supabase.storage.from("lesion-photos").remove([image_path]).catch(()=>{});
-  }
+  if(image_path){ await supabase.storage.from("lesion-photos").remove([image_path]).catch(()=>{}); }
 }
 
-// ===== Render list =====
+/* ================= List render ================= */
 async function renderList(){
   const tr = t(); const list=document.getElementById("list");
+  if(!currentUser){ list.innerHTML = `<p class="tiny">${tr.authUi.off} – ${tr.authUi.signin || 'Sign in'}</p>`; return; }
   const entries = await fetchEntries();
   list.innerHTML = "";
   if(entries.length===0){ list.innerHTML = `<p class="tiny">${tr.noRecords}</p>`; return; }
 
   for(const e of entries){
-    const div=document.createElement("div"); div.className="entry"; div.dataset.id=e.id;
+    const div=document.createElement("div"); div.className="entry"; div.dataset.id=e.id; if(e.image_path) div.dataset.path=e.image_path;
     const titleLine = [e.date || "", e.title || ""].filter(Boolean).join(" – ");
     div.innerHTML = `
       <h3>${escapeHtml(titleLine)}</h3>
       <div class="badges">${escapeHtml(summarizeABCDE(e))}</div>
-      ${e.notes ? `<p>${tr.labels.notes}: ${escapeHtml(e.notes)}</p>` : ""}
-      ${e.changes_text ? `<p>${tr.labels.changes}: ${escapeHtml(e.changes_text)}</p>` : ""}
+      ${e.notes ? `<p>${t().labels.notes}: ${escapeHtml(e.notes)}</p>` : ""}
+      ${e.changes_text ? `<p>${t().labels.changes}: ${escapeHtml(e.changes_text)}</p>` : ""}
       <div class="row">
-        ${e.image_url ? `<a class="link-btn" href="${e.image_url}" target="_blank" rel="noopener">${tr.openImage}</a>` : ""}
+        ${e.image_url ? `<a class="link-btn" href="${e.image_url}" target="_blank" rel="noopener">${t().openImage}</a>` : ""}
         <div class="spacer"></div>
-        <button type="button" class="danger delete-btn">${tr.delete}</button>
+        <button type="button" class="danger delete-btn">${t().delete}</button>
       </div>`;
-    // שמירת נתיב למחיקה
-    if(e.image_path){ div.dataset.path = e.image_path; }
     list.appendChild(div);
   }
 }
-
-// Delegation למחיקה
 document.getElementById("list").addEventListener("click", async (ev)=>{
   const btn = ev.target.closest(".delete-btn"); if(!btn) return;
   const card = ev.target.closest(".entry"); if(!card) return;
-  if(confirm(t().confirmDelete)){
-    await deleteEntryServer(card.dataset.id, card.dataset.path || null);
-    renderList();
-  }
+  if(confirm(t().confirmDelete)){ await deleteEntryServer(card.dataset.id, card.dataset.path || null); renderList(); }
 });
 
-// ===== Submit form =====
+/* ================= Form submit ================= */
 document.getElementById("entryForm").addEventListener("submit", async (ev)=>{
   ev.preventDefault();
-  if(!currentUser){ await ensureAuth(); if(!currentUser) return; }
+  if(!currentUser){ await signInAnon(); if(!currentUser) return; }
 
   const f = ev.currentTarget;
   const date = f.date.value || new Date().toISOString().slice(0,10);
@@ -240,11 +265,9 @@ document.getElementById("entryForm").addEventListener("submit", async (ev)=>{
     if(v) ABCDE[k] = v.value;
   });
   let changes_text = "";
-  if(isChangeValue(ABCDE.E)){
-    changes_text = (document.getElementById("changesText").value || "").trim();
-  }
+  if(isChangeValue(ABCDE.E)){ changes_text = (document.getElementById("changesText").value || "").trim(); }
 
-  // העלאת תמונה (אם יש)
+  // upload image (if any)
   let imgPath=null, imgUrl=null;
   const file = f.photo.files && f.photo.files[0] ? f.photo.files[0] : null;
   const tempId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random());
@@ -267,8 +290,7 @@ document.getElementById("entryForm").addEventListener("submit", async (ev)=>{
 
   const saved = await insertEntry(payload);
   if(saved){
-    f.reset();
-    buildABCDE(currentLang()); toggleChangesBox(false);
+    f.reset(); buildABCDE(currentLang()); toggleChangesBox(false);
     document.getElementById("date").value = new Date().toISOString().slice(0,10);
     renderList();
   }else{
@@ -276,15 +298,14 @@ document.getElementById("entryForm").addEventListener("submit", async (ev)=>{
   }
 });
 
-// ===== Export DOC (Word) =====
+/* ================= Export to DOC (Word) ================= */
 document.getElementById("exportDocBtn").addEventListener("click", async ()=>{
-  const tr = t(); const L = tr.labels;
+  const tr = t(), L = tr.labels;
   const entries = (await fetchEntries()).sort((a,b)=> (a.created_at||"") > (b.created_at||"") ? 1 : -1);
   if(entries.length===0){ alert(tr.noRecords); return; }
 
   const dir = document.documentElement.dir || "rtl";
   const lang = document.documentElement.lang || "he";
-
   let html = `<!DOCTYPE html><html lang="${lang}" dir="${dir}"><head><meta charset="utf-8">
 <style>
   body{font-family:Arial,Helvetica,sans-serif;line-height:1.4}
@@ -294,8 +315,7 @@ document.getElementById("exportDocBtn").addEventListener("click", async ()=>{
   .lbl{font-weight:bold}
   img{max-width:400px;height:auto;display:block;margin:.4rem 0;border:1px solid #ccc;padding:2px}
   .mono{font-family:ui-monospace,Consolas,monospace}
-</style>
-</head><body>`;
+</style></head><body>`;
 
   for(const e of entries){
     const abcde = summarizeABCDE({ abcde: e.abcde });
@@ -321,12 +341,11 @@ document.getElementById("exportDocBtn").addEventListener("click", async ()=>{
   setTimeout(()=>URL.revokeObjectURL(url), 1000);
 });
 
-// ===== UI: שפה + אתחול =====
+/* ================= Language + init ================= */
 function applyLanguage(lang){
   const tr = translations[lang];
   document.documentElement.lang = (lang==="he") ? "he" : "ru";
   document.documentElement.dir  = (lang==="he") ? "rtl" : "ltr";
-
   document.getElementById("title").textContent = tr.title;
   document.getElementById("note").textContent  = tr.note;
   document.getElementById("lblDate").textContent  = tr.lblDate;
@@ -338,7 +357,10 @@ function applyLanguage(lang){
   document.getElementById("exportDocBtn").textContent = tr.exportDoc;
   document.getElementById("clearBtn").textContent = tr.btnClear;
   document.getElementById("myRecords").textContent= tr.myRecords;
+  document.getElementById("btnAnonSignIn").textContent = tr.authUi.signin;
+  document.getElementById("btnSignOut").textContent    = tr.authUi.signout;
 
+  // rebuild ABCDE (keep existing choices if any)
   const sel = {}; ["A","B","C","D","E"].forEach(k=>{
     const checked = document.querySelector(`#entryForm input[name="${k}"]:checked`);
     if(checked) sel[k]=checked.value;
@@ -351,26 +373,13 @@ function applyLanguage(lang){
     }
   });
 }
+
 document.getElementById("langSwitcher").addEventListener("change", e=> applyLanguage(e.target.value));
 
-// איפוס כל הרשומות (שרת)
-document.getElementById("clearBtn").addEventListener("click", async ()=>{
-  if(!currentUser){ await ensureAuth(); if(!currentUser) return; }
-  if(confirm(t().confirmDeleteAll)){
-    // נמחק כל הרשומות (RLS מגביל לרשומות של המשתמש בלבד)
-    const entries = await fetchEntries();
-    const paths = entries.map(e=>e.image_path).filter(Boolean);
-    await supabase.from("entries").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    if(paths.length){ await supabase.storage.from("lesion-photos").remove(paths).catch(()=>{}); }
-    renderList();
-  }
-});
-
-// init
 (async function init(){
-  applyLanguage("he"); // ברירת מחדל; תוכל/י לשנות תיכף בתפריט
+  applyLanguage("he"); // default (user can switch)
   document.getElementById("date").value = new Date().toISOString().slice(0,10);
-  await ensureAuth();
+  await loadSession();   // if a session exists, we'll use it; otherwise show "Sign in" button
   await renderList();
 })();
 </script>
