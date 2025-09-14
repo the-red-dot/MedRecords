@@ -6,12 +6,12 @@
 <title>מעקב נגעי עור – ABCDE</title>
 <style>
   body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.5;margin:0}
-  header{background:#fff;padding:12px 16px;border-bottom:1px solid #ddd;position:sticky;top:0;z-index:10}
-  h1{margin:0;font-size:1.25rem}
+  header{background:#fff;padding:12px 16px;border-bottom:1px solid #ddd;position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center}
+  h1{margin:0;font-size:1.1rem}
   main{padding:16px;max-width:800px;margin:auto}
   .card{background:#f9f9f9;border:1px solid #ddd;border-radius:12px;padding:14px;margin:12px 0}
   label{font-weight:600;display:block;margin-top:8px}
-  input,textarea,button{font-size:1rem}
+  input,textarea,button,select{font-size:1rem}
   input[type="date"],input[type="text"],textarea{width:100%;padding:8px;border:1px solid #ccc;border-radius:8px;box-sizing:border-box}
   textarea{min-height:80px}
   .abcde-item{background:#fff;border:1px solid #ddd;border-radius:10px;padding:10px;margin-top:8px}
@@ -44,11 +44,10 @@
       <label for="notes" id="lblNotes"></label>
       <textarea id="notes" name="notes"></textarea>
       <label for="photo" id="lblPhoto"></label>
-      <input id="photo" name="photo" type="file" accept="image/*" capture="environment">
+      <!-- removed capture to allow gallery OR camera -->
+      <input id="photo" name="photo" type="file" accept="image/*">
       
-      <div id="abcdeSection">
-        <!-- יוכנס דינאמית -->
-      </div>
+      <div id="abcdeSection"></div>
 
       <div class="actions">
         <button type="submit" class="primary" id="btnAdd"></button>
@@ -67,6 +66,7 @@
 </main>
 
 <script>
+// ================= Translations =================
 const translations = {
   he:{
     title:"מעקב נגעי עור – ABCDE",
@@ -110,49 +110,122 @@ const translations = {
   }
 };
 
-function renderLang(lang){
-  const t = translations[lang];
-  document.documentElement.lang = lang==="he"?"he":"ru";
-  document.documentElement.dir = lang==="he"?"rtl":"ltr";
-  document.getElementById("title").textContent = t.title;
-  document.getElementById("note").textContent = t.note;
-  document.getElementById("lblDate").textContent = t.lblDate;
-  document.getElementById("lblTitle").textContent = t.lblTitle;
-  document.getElementById("lblNotes").textContent = t.lblNotes;
-  document.getElementById("lblPhoto").textContent = t.lblPhoto;
-  document.getElementById("btnAdd").textContent = t.btnAdd;
-  document.getElementById("exportBtn").textContent = t.btnExport;
-  document.getElementById("importBtn").textContent = t.btnImport;
-  document.getElementById("clearBtn").textContent = t.btnClear;
-  document.getElementById("myRecords").textContent = t.myRecords;
+// ================= Helpers =================
+function readFileAsDataURL(file){
+  return new Promise((resolve,reject)=>{
+    const r=new FileReader();
+    r.onload=()=>resolve(r.result);
+    r.onerror=reject;
+    r.readAsDataURL(file);
+  });
+}
 
-  // ABCDE section
-  const sec = document.getElementById("abcdeSection");
-  sec.innerHTML="";
-  for(const key in t.abcde){
-    const [title,opt1,opt2] = t.abcde[key];
-    const field = document.createElement("fieldset");
-    field.className="abcde-item";
-    const legend = document.createElement("legend");
-    legend.textContent = key+" – "+title;
-    field.appendChild(legend);
-    const d1 = document.createElement("label");
-    const r1 = document.createElement("input"); r1.type="radio"; r1.name=key; r1.value=opt1; r1.required=true;
-    d1.appendChild(r1); d1.append(" "+opt1);
-    const d2 = document.createElement("label");
-    const r2 = document.createElement("input"); r2.type="radio"; r2.name=key; r2.value=opt2;
-    d2.appendChild(r2); d2.append(" "+opt2);
-    field.appendChild(d1); field.appendChild(d2);
-    sec.appendChild(field);
+function saveEntries(entries){
+  localStorage.setItem("skin_entries",JSON.stringify(entries));
+}
+function loadEntries(){
+  try{return JSON.parse(localStorage.getItem("skin_entries")||"[]");}catch(e){return []}
+}
+function summarizeABCDE(entry){
+  return ["A","B","C","D","E"].map(k=>k+": "+(entry.ABCDE[k]||"?")).join(" | ");
+}
+function renderList(){
+  const list=document.getElementById("list");
+  const entries=loadEntries().sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  list.innerHTML="";
+  if(entries.length===0){list.innerHTML="<p class='tiny'>אין רשומות.</p>";return;}
+  for(const e of entries){
+    const div=document.createElement("div");div.className="entry";
+    const h=document.createElement("h3");
+    h.textContent=(e.date||"")+" – "+(e.title||"");
+    div.appendChild(h);
+    const badges=document.createElement("div");badges.className="badges";
+    badges.textContent=summarizeABCDE(e);
+    div.appendChild(badges);
+    if(e.notes){const p=document.createElement("p");p.textContent="תיאור: "+e.notes;div.appendChild(p);}
+    if(e.image){const a=document.createElement("a");a.href=e.image;a.target="_blank";a.textContent="📷 פתח תמונה";div.appendChild(a);}
+    list.appendChild(div);
   }
 }
 
-document.getElementById("langSwitcher").addEventListener("change", e=>{
-  renderLang(e.target.value);
+// ================= Form Handling =================
+document.getElementById("entryForm").addEventListener("submit",async ev=>{
+  ev.preventDefault();
+  const form=ev.currentTarget;
+  const date=form.date.value;
+  const title=form.title.value.trim();
+  const notes=form.notes.value.trim();
+  const ABCDE={};
+  ["A","B","C","D","E"].forEach(k=>{
+    const v=form.querySelector(`input[name=${k}]:checked`);
+    if(v) ABCDE[k]=v.value;
+  });
+  let image="";
+  if(form.photo.files && form.photo.files[0]){
+    try{image=await readFileAsDataURL(form.photo.files[0]);}catch(e){}
+  }
+  const entry={id:Date.now()+"",date,title,notes,ABCDE,image,createdAt:Date.now()};
+  const entries=loadEntries();entries.push(entry);saveEntries(entries);
+  renderList();form.reset();
+  ["A","B","C","D","E"].forEach(k=>{
+    const el=form.querySelector(`input[name=${k}]`);if(el)el.required=true;
+  });
 });
 
-// ברירת מחדל עברית
-renderLang("he");
+// Export/Import/Clear
+document.getElementById("exportBtn").addEventListener("click",()=>{
+  const data=JSON.stringify(loadEntries(),null,2);
+  const blob=new Blob([data],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");a.href=url;a.download="skin-entries.json";
+  a.click();URL.revokeObjectURL(url);
+});
+document.getElementById("importBtn").addEventListener("click",()=>{document.getElementById("importFile").click();});
+document.getElementById("importFile").addEventListener("change",async e=>{
+  const f=e.target.files[0];if(!f)return;const txt=await f.text();
+  try{const arr=JSON.parse(txt);if(Array.isArray(arr)){saveEntries(arr);renderList();}}catch{}
+});
+document.getElementById("clearBtn").addEventListener("click",()=>{if(confirm("למחוק הכל?")){localStorage.removeItem("skin_entries");renderList();}});
+
+// ================= Language Switching =================
+function renderLang(lang){
+  const t=translations[lang];
+  document.documentElement.lang=lang==="he"?"he":"ru";
+  document.documentElement.dir=lang==="he"?"rtl":"ltr";
+  document.getElementById("title").textContent=t.title;
+  document.getElementById("note").textContent=t.note;
+  document.getElementById("lblDate").textContent=t.lblDate;
+  document.getElementById("lblTitle").textContent=t.lblTitle;
+  document.getElementById("lblNotes").textContent=t.lblNotes;
+  document.getElementById("lblPhoto").textContent=t.lblPhoto;
+  document.getElementById("btnAdd").textContent=t.btnAdd;
+  document.getElementById("exportBtn").textContent=t.btnExport;
+  document.getElementById("importBtn").textContent=t.btnImport;
+  document.getElementById("clearBtn").textContent=t.btnClear;
+  document.getElementById("myRecords").textContent=t.myRecords;
+  const sec=document.getElementById("abcdeSection");sec.innerHTML="";
+  for(const k in t.abcde){
+    const [title,opt1,opt2]=t.abcde[k];
+    const fs=document.createElement("fieldset");fs.className="abcde-item";
+    const lg=document.createElement("legend");lg.textContent=k+" – "+title;fs.appendChild(lg);
+    [opt1,opt2].forEach((opt,i)=>{
+      const label=document.createElement("label");
+      const r=document.createElement("input");r.type="radio";r.name=k;r.value=opt;if(i===0)r.required=true;
+      label.appendChild(r);label.append(" "+opt);fs.appendChild(label);
+    });
+    sec.appendChild(fs);
+  }
+}
+document.getElementById("langSwitcher").addEventListener("change",e=>{
+  renderLang(e.target.value);localStorage.setItem("skin_lang",e.target.value);
+});
+
+// Init
+const savedLang=localStorage.getItem("skin_lang")||"he";
+document.getElementById("langSwitcher").value=savedLang;
+renderLang(savedLang);
+document.getElementById("date").value=new Date().toISOString().slice(0,10);
+renderList();
 </script>
 </body>
 </html>
