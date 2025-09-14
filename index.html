@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>מעקב נגעי עור – ABCDE</title>
+<style>
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.5;margin:0}
+  header{background:#fff;padding:12px 16px;border-bottom:1px solid #ddd;position:sticky;top:0;z-index:10}
+  h1{margin:0;font-size:1.25rem}
+  main{padding:16px;max-width:800px;margin:auto}
+  .card{background:#f9f9f9;border:1px solid #ddd;border-radius:12px;padding:14px;margin:12px 0}
+  label{font-weight:600;display:block;margin-top:8px}
+  input,textarea,button{font-size:1rem}
+  input[type="date"],input[type="text"],textarea{width:100%;padding:8px;border:1px solid #ccc;border-radius:8px;box-sizing:border-box}
+  textarea{min-height:80px}
+  .abcde-item{background:#fff;border:1px solid #ddd;border-radius:10px;padding:10px;margin-top:8px}
+  .abcde-options label{margin-right:12px}
+  .actions{margin-top:12px;display:flex;gap:10px;flex-wrap:wrap}
+  button{padding:10px 14px;border:none;border-radius:8px;cursor:pointer}
+  button.primary{background:#0a7cff;color:#fff;font-weight:700}
+  button.secondary{background:#e9eefb;color:#0a2a5f}
+  .tiny{font-size:.85rem;color:#555}
+  .entry{background:#fff;border:1px solid #ddd;border-radius:10px;padding:10px;margin-top:10px}
+  .badges{margin:4px 0;font-size:.85rem;color:#333}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">מעקב נגעי עור – ABCDE</h1>
+  <select id="langSwitcher">
+    <option value="he">עברית</option>
+    <option value="ru">Русский</option>
+  </select>
+</header>
+<main>
+  <section class="card">
+    <p class="tiny" id="note"></p>
+    <form id="entryForm">
+      <label for="date" id="lblDate"></label>
+      <input id="date" name="date" type="date" required>
+      <label for="title" id="lblTitle"></label>
+      <input id="title" name="title" type="text">
+      <label for="notes" id="lblNotes"></label>
+      <textarea id="notes" name="notes"></textarea>
+      <label for="photo" id="lblPhoto"></label>
+      <input id="photo" name="photo" type="file" accept="image/*" capture="environment">
+      
+      <div id="abcdeSection">
+        <!-- יוכנס דינאמית -->
+      </div>
+
+      <div class="actions">
+        <button type="submit" class="primary" id="btnAdd"></button>
+        <button type="button" class="secondary" id="exportBtn"></button>
+        <button type="button" class="secondary" id="importBtn"></button>
+        <input type="file" id="importFile" accept="application/json" hidden>
+        <button type="button" class="secondary" id="clearBtn"></button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2 id="myRecords"></h2>
+    <div id="list"></div>
+  </section>
+</main>
+
+<script>
+const translations = {
+  he:{
+    title:"מעקב נגעי עור – ABCDE",
+    note:"המידע נשמר לוקאלית בלבד במכשיר שלך.",
+    lblDate:"תאריך",
+    lblTitle:"כותרת קצרה (אופציונלי)",
+    lblNotes:"תיאור/תסמינים",
+    lblPhoto:"תמונה (מומלץ)",
+    btnAdd:"הוסף/י תיעוד",
+    btnExport:"ייצוא גיבוי",
+    btnImport:"ייבוא",
+    btnClear:"איפוס הכל",
+    myRecords:"הרשומות שלי",
+    abcde:{
+      A:["אסימטריה","סימטרי","לא סימטרי"],
+      B:["גבול","גבולות ברורים","גבול לא אחיד/משונן"],
+      C:["צבע","צבע אחיד","מספר צבעים"],
+      D:["קוטר","קטן מ-6 מ\"מ","גדול מ-6 מ\"מ"],
+      E:["שינוי/התפתחות","ללא שינוי","יש שינוי"]
+    }
+  },
+  ru:{
+    title:"Мониторинг кожных поражений – ABCDE",
+    note:"Данные сохраняются только локально на вашем устройстве.",
+    lblDate:"Дата",
+    lblTitle:"Краткий заголовок (опционально)",
+    lblNotes:"Описание/симптомы",
+    lblPhoto:"Фото (рекомендуется)",
+    btnAdd:"Добавить запись",
+    btnExport:"Экспорт резервной копии",
+    btnImport:"Импорт",
+    btnClear:"Очистить все",
+    myRecords:"Мои записи",
+    abcde:{
+      A:["Асимметрия","Симметричное","Асимметричное"],
+      B:["Граница","Чёткая граница","Нечёткая/неровная"],
+      C:["Цвет","Один цвет","Несколько цветов"],
+      D:["Диаметр","Меньше 6 мм","Больше 6 мм"],
+      E:["Эволюция","Без изменений","Есть изменения"]
+    }
+  }
+};
+
+function renderLang(lang){
+  const t = translations[lang];
+  document.documentElement.lang = lang==="he"?"he":"ru";
+  document.documentElement.dir = lang==="he"?"rtl":"ltr";
+  document.getElementById("title").textContent = t.title;
+  document.getElementById("note").textContent = t.note;
+  document.getElementById("lblDate").textContent = t.lblDate;
+  document.getElementById("lblTitle").textContent = t.lblTitle;
+  document.getElementById("lblNotes").textContent = t.lblNotes;
+  document.getElementById("lblPhoto").textContent = t.lblPhoto;
+  document.getElementById("btnAdd").textContent = t.btnAdd;
+  document.getElementById("exportBtn").textContent = t.btnExport;
+  document.getElementById("importBtn").textContent = t.btnImport;
+  document.getElementById("clearBtn").textContent = t.btnClear;
+  document.getElementById("myRecords").textContent = t.myRecords;
+
+  // ABCDE section
+  const sec = document.getElementById("abcdeSection");
+  sec.innerHTML="";
+  for(const key in t.abcde){
+    const [title,opt1,opt2] = t.abcde[key];
+    const field = document.createElement("fieldset");
+    field.className="abcde-item";
+    const legend = document.createElement("legend");
+    legend.textContent = key+" – "+title;
+    field.appendChild(legend);
+    const d1 = document.createElement("label");
+    const r1 = document.createElement("input"); r1.type="radio"; r1.name=key; r1.value=opt1; r1.required=true;
+    d1.appendChild(r1); d1.append(" "+opt1);
+    const d2 = document.createElement("label");
+    const r2 = document.createElement("input"); r2.type="radio"; r2.name=key; r2.value=opt2;
+    d2.appendChild(r2); d2.append(" "+opt2);
+    field.appendChild(d1); field.appendChild(d2);
+    sec.appendChild(field);
+  }
+}
+
+document.getElementById("langSwitcher").addEventListener("change", e=>{
+  renderLang(e.target.value);
+});
+
+// ברירת מחדל עברית
+renderLang("he");
+</script>
+</body>
+</html>
