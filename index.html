@@ -323,7 +323,6 @@ document.getElementById("summaryBtn").addEventListener("click", async ()=>{
 
   const dir = document.documentElement.dir || "rtl";
   const lang = document.documentElement.lang || "he";
-  const w = window.open("", "_blank");
   const safe = (s)=>escapeHtml(s);
 
   // Build summary HTML (chronological by date)
@@ -370,7 +369,18 @@ document.getElementById("summaryBtn").addEventListener("click", async ()=>{
   }
 
   html += `</main></body></html>`;
-  w.document.open(); w.document.write(html); w.document.close();
+
+  // Open summary in a new tab using a Blob URL (better mobile support)
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url  = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.target = "_blank";
+  a.rel = "noopener";
+  a.click();
+
+  setTimeout(()=> URL.revokeObjectURL(url), 60000);
 });
 
 /* ================= Language + init ================= */
