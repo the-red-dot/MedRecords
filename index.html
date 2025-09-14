@@ -315,17 +315,34 @@ document.getElementById("entryForm").addEventListener("submit", async (ev)=>{
 });
 
 /* ================= Summary page (opens new tab) ================= */
-document.getElementById("summaryBtn").addEventListener("click", async ()=>{
-  if(!currentUser){ await signInAnon(); if(!currentUser) return; }
+document.getElementById("summaryBtn").addEventListener("click", async (ev)=>{
+  // 1) Open a window/tab *synchronously* to bypass mobile popup blockers
+  const w = window.open('', '_blank');
+  if(!w){
+    alert('Please allow pop-ups to view the summary page.');
+    return;
+  }
+  // Light "loading" skeleton so users see something immediately
+  w.document.open();
+  w.document.write(`<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Loading…</title><style>body{font-family:system-ui;margin:24px}</style><p>טוען/ת את הסיכום…</p>`);
+  w.document.close();
+
+  // 2) Now do async work
+  if(!currentUser){ await signInAnon(); if(!currentUser){ w.close(); return; } }
   const tr = t(), L = tr.labels;
   const entries = await fetchEntries();
-  if(!entries.length){ alert(tr.summaryNoData); return; }
+  if(!entries.length){
+    w.document.open(); w.document.write(`<p style="font-family:system-ui;margin:24px">${tr.summaryNoData}</p>`); w.document.close();
+    return;
+  }
 
   const dir = document.documentElement.dir || "rtl";
   const lang = document.documentElement.lang || "he";
+  const returnUrl = location.href;
   const safe = (s)=>escapeHtml(s);
 
-  // Build summary HTML (chronological by date)
+  // 3) Build the full summary HTML
   let html = `<!DOCTYPE html><html lang="${lang}" dir="${dir}">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${safe(tr.summaryTitle)}</title>
@@ -342,14 +359,14 @@ document.getElementById("summaryBtn").addEventListener("click", async ()=>{
   .abcde{font-family:ui-monospace,Consolas,monospace;padding:.25rem .5rem;background:#fff;border:1px solid var(--border);border-radius:8px;display:inline-block}
   img{max-width:45%;height:auto;display:block;margin:.5rem 0;border:1px solid var(--border);border-radius:10px}
   .top-actions{margin-inline-start:auto;display:flex;gap:8px}
-  button{padding:8px 12px;border:1px solid var(--border);background:#f5f7fb;border-radius:8px;cursor:pointer}
+  .btn{padding:8px 12px;border:1px solid var(--border);background:#f5f7fb;border-radius:8px;cursor:pointer;text-decoration:none;color:inherit;display:inline-block}
 </style>
 </head><body>
 <header>
   <h1>${safe(tr.summaryTitle)}</h1>
   <div class="top-actions">
-    <button onclick="window.print()">${dir==='rtl'?'הדפסה/שיתוף':'Print/Share'}</button>
-    <button onclick="history.back()">${dir==='rtl'?'חזרה':'Back'}</button>
+    <button class="btn" onclick="window.print()">${dir==='rtl'?'הדפסה/שיתוף':'Print/Share'}</button>
+    <a class="btn" href="${safe(returnUrl)}">${dir==='rtl'?'חזרה לאפליקציה':'Back to app'}</a>
   </div>
 </header>
 <main>`;
@@ -367,20 +384,13 @@ document.getElementById("summaryBtn").addEventListener("click", async ()=>{
       ${e.image_url ? `<img src="${e.image_url}" alt="photo">` : ""}
     </article>`;
   }
-
   html += `</main></body></html>`;
 
-  // Open summary in a new tab using a Blob URL (better mobile support)
-  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-  const url  = URL.createObjectURL(blob);
-
-  const a = document.createElement("a");
-  a.href = url;
-  a.target = "_blank";
-  a.rel = "noopener";
-  a.click();
-
-  setTimeout(()=> URL.revokeObjectURL(url), 60000);
+  // 4) Replace the provisional tab's contents.
+  // Write directly (works well after the tab is already user-opened).
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
 });
 
 /* ================= Language + init ================= */
