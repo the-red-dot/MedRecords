@@ -30,6 +30,7 @@
   .spacer{flex:1}
   .danger{background:#ffe8e8;color:#842029}
   .link-btn{display:inline-block;text-decoration:none;padding:8px 12px;border:1px solid var(--border);border-radius:10px}
+  .hide{display:none}
 </style>
 </head>
 <body>
@@ -43,7 +44,7 @@
 
 <main>
   <section class="card">
-    <p class="tiny" id="note">המידע נשמר לוקאלית בלבד במכשיר שלך.</p>
+    <p class="tiny" id="note">המידע נשמר בחשבון Supabase הפרטי שלך (עם כניסה אנונימית). התמונות נשמרות באחסון הענן שלך.</p>
 
     <form id="entryForm">
       <label for="date" id="lblDate">תאריך</label>
@@ -56,13 +57,11 @@
       <textarea id="notes" name="notes" placeholder="שינויים, כאב/גרד, דימום, מיקום..."></textarea>
 
       <label for="photo" id="lblPhoto">תמונה (מומלץ)</label>
-      <!-- לא מכריח מצלמה: מאפשר בחירה מצלמה/גלריה -->
       <input id="photo" name="photo" type="file" accept="image/*">
 
       <div id="abcdeSection"></div>
 
-      <!-- תיבת טקסט נפתחת רק אם יש שינוי (E) -->
-      <div id="changesWrap" style="display:none;">
+      <div id="changesWrap" class="hide">
         <label for="changesText" id="lblChangesText">פרטי השינויים</label>
         <textarea id="changesText" name="changesText" placeholder="מה השתנה? גודל, צבע, צורה, דימום..."></textarea>
       </div>
@@ -70,333 +69,223 @@
       <div class="actions">
         <button type="submit" class="primary" id="btnAdd">הוסף/י תיעוד</button>
         <button type="button" class="secondary" id="exportDocBtn">ייצוא לדוק (Word)</button>
-        <button type="button" class="secondary" id="importBtn">ייבוא JSON</button>
-        <input type="file" id="importFile" accept="application/json" hidden>
-        <button type="button" class="secondary" id="clearBtn">איפוס הכל</button>
+        <button type="button" class="secondary" id="clearBtn">איפוס הכל (שרת)</button>
       </div>
+
+      <p class="tiny" id="authState">מתחבר...</p>
     </form>
   </section>
 
-    <section class="card">
-      <h2 id="myRecords">הרשומות שלי</h2>
-      <div id="list"></div>
-    </section>
+  <section class="card">
+    <h2 id="myRecords">הרשומות שלי</h2>
+    <div id="list"></div>
+  </section>
 </main>
 
+<!-- Supabase JS v2 -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-// ================= תרגומים =================
+// ===== Supabase config (אל תשתמשו ב-service_role בצד לקוח) =====
+const SUPABASE_URL = "https://gcjfkgrohlitqzktgqvd.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdjamZrZ3JvaGxpdHF6a3RncXZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc4NjA2ODEsImV4cCI6MjA3MzQzNjY4MX0.aWha5IHE6lttKC3h8qa3JvKf6uH9OZwAIs_EESNoZig";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUser = null;
+
+// ===== תרגומים =====
 const translations = {
-  he:{
-    title:"מעקב נגעי עור – ABCDE",
-    note:"המידע נשמר לוקאלית בלבד במכשיר שלך.",
-    lblDate:"תאריך",
-    lblTitle:"כותרת קצרה (אופציונלי)",
-    lblNotes:"תיאור/תסמינים",
-    lblPhoto:"תמונה (מומלץ)",
-    lblChangesText:"פרטי השינויים",
-    btnAdd:"הוסף/י תיעוד",
-    exportDoc:"ייצוא לדוק (Word)",
-    btnImport:"ייבוא JSON",
-    btnClear:"איפוס הכל",
-    myRecords:"הרשומות שלי",
-    openImage:"📷 פתח תמונה",
-    delete:"מחיקה",
-    confirmDelete:"למחוק את הרשומה?",
-    confirmDeleteAll:"למחוק את כל הרשומות?",
-    noRecords:"אין רשומות.",
-    abcde:{
-      A:["אסימטריה","סימטרי","לא סימטרי"],
-      B:["גבול","גבולות ברורים","גבול לא אחיד/משונן"],
-      C:["צבע","צבע אחיד","מספר צבעים"],
-      D:["קוטר","קטן מ-6 מ\"מ","גדול מ-6 מ\"מ"],
-      E:["שינוי/התפתחות","ללא שינוי","יש שינוי"]
-    },
-    labels:{
-      date:"תאריך", title:"כותרת", notes:"תיאור/תסמינים",
-      abcde:"סיכום ABCDE", changes:"פרטי השינויים", image:"תמונה"
-    }
+  he:{ title:"מעקב נגעי עור – ABCDE", note:"המידע נשמר בחשבון Supabase הפרטי שלך (עם כניסה אנונימית). התמונות נשמרות באחסון הענן שלך.",
+    lblDate:"תאריך", lblTitle:"כותרת קצרה (אופציונלי)", lblNotes:"תיאור/תסמינים", lblPhoto:"תמונה (מומלץ)",
+    lblChangesText:"פרטי השינויים", btnAdd:"הוסף/י תיעוד", exportDoc:"ייצוא לדוק (Word)", btnClear:"איפוס הכל (שרת)",
+    myRecords:"הרשומות שלי", openImage:"📷 פתח תמונה", delete:"מחיקה", confirmDelete:"למחוק את הרשומה?",
+    confirmDeleteAll:"למחוק את כל הרשומות מהשרת?", noRecords:"אין רשומות.",
+    abcde:{ A:["אסימטריה","סימטרי","לא סימטרי"], B:["גבול","גבולות ברורים","גבול לא אחיד/משונן"],
+            C:["צבע","צבע אחיד","מספר צבעים"], D:["קוטר","קטן מ-6 מ\"מ","גדול מ-6 מ\"מ"], E:["שינוי/התפתחות","ללא שינוי","יש שינוי"] },
+    labels:{ date:"תאריך", title:"כותרת", notes:"תיאור/תסמינים", abcde:"סיכום ABCDE", changes:"פרטי השינויים", image:"תמונה" },
+    auth:{ connecting:"מתחבר...", ready:"מחובר (אנונימי)", err:"שגיאת התחברות" }
   },
-  ru:{
-    title:"Мониторинг кожных поражений – ABCDE",
-    note:"Данные сохраняются только локально на вашем устройстве.",
-    lblDate:"Дата",
-    lblTitle:"Краткий заголовок (опционально)",
-    lblNotes:"Описание/симптомы",
-    lblPhoto:"Фото (рекомендуется)",
-    lblChangesText:"Подробности изменений",
-    btnAdd:"Добавить запись",
-    exportDoc:"Экспорт в DOC (Word)",
-    btnImport:"Импорт JSON",
-    btnClear:"Очистить все",
-    myRecords:"Мои записи",
-    openImage:"📷 Открыть фото",
-    delete:"Удалить",
-    confirmDelete:"Удалить запись?",
-    confirmDeleteAll:"Удалить все записи?",
-    noRecords:"Записей нет.",
-    abcde:{
-      A:["Асимметрия","Симметричное","Асимметричное"],
-      B:["Граница","Чёткая граница","Нечёткая/неровная"],
-      C:["Цвет","Один цвет","Несколько цветов"],
-      D:["Диаметр","Меньше 6 мм","Больше 6 мм"],
-      E:["Эволюция","Без изменений","Есть изменения"]
-    },
-    labels:{
-      date:"Дата", title:"Заголовок", notes:"Описание/симптомы",
-      abcde:"Сводка ABCDE", changes:"Подробности изменений", image:"Фото"
-    }
+  ru:{ title:"Мониторинг кожных поражений – ABCDE", note:"Данные сохраняются в вашем Supabase (анонимный вход). Фото в облачном хранилище.",
+    lblDate:"Дата", lblTitle:"Краткий заголовок (опционально)", lblNotes:"Описание/симптомы", lblPhoto:"Фото (рекомендуется)",
+    lblChangesText:"Подробности изменений", btnAdd:"Добавить запись", exportDoc:"Экспорт в DOC (Word)", btnClear:"Очистить все (сервер)",
+    myRecords:"Мои записи", openImage:"📷 Открыть фото", delete:"Удалить", confirmDelete:"Удалить запись?",
+    confirmDeleteAll:"Удалить все записи на сервере?", noRecords:"Записей нет.",
+    abcde:{ A:["Асимметрия","Симметричное","Асимметричное"], B:["Граница","Чёткая граница","Нечёткая/неровная"],
+            C:["Цвет","Один цвет","Несколько цветов"], D:["Диаметр","Меньше 6 мм","Больше 6 мм"], E:["Эволюция","Без изменений","Есть изменения"] },
+    labels:{ date:"Дата", title:"Заголовок", notes:"Описание/симптомы", abcde:"Сводка ABCDE", changes:"Подробности изменений", image:"Фото" },
+    auth:{ connecting:"Подключение...", ready:"Подключено (анонимно)", err:"Ошибка входа" }
   }
 };
-
-// ================= עזר =================
-const LS_KEY_ENTRIES = "skin_entries";
-const LS_KEY_LANG = "skin_lang";
-
-function readFileAsDataURL(file){
-  return new Promise((resolve,reject)=>{
-    const r=new FileReader();
-    r.onload=()=>resolve(r.result);
-    r.onerror=reject;
-    r.readAsDataURL(file);
-  });
-}
-
-function saveEntries(entries){ localStorage.setItem(LS_KEY_ENTRIES, JSON.stringify(entries)); }
-function loadEntries(){
-  try { return JSON.parse(localStorage.getItem(LS_KEY_ENTRIES) || "[]"); }
-  catch(e){ return []; }
-}
-
-function summarizeABCDE(entry){
-  return ["A","B","C","D","E"].map(k=>k+": "+(entry.ABCDE?.[k]||"?")).join(" | ");
-}
-
 function currentLang(){ return document.getElementById("langSwitcher").value || "he"; }
 function t(){ return translations[currentLang()]; }
 
-// מחיקה לפי מזהה (עם ריענון)
-function deleteEntry(id){
-  const entries = loadEntries().filter(e => e.id !== id);
-  saveEntries(entries);
-  renderList();
+function escapeHtml(s){return String(s||"").replace(/[&<>"]/g, ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]))}
+
+// ===== ABCDE UI =====
+function isChangeValue(v){ return v && (v === "יש שינוי" || v === "Есть изменения"); }
+function buildABCDE(lang){
+  const tr = translations[lang]; const sec = document.getElementById("abcdeSection"); sec.innerHTML="";
+  for(const k of ["A","B","C","D","E"]){
+    const [title,opt1,opt2]=tr.abcde[k];
+    const fs=document.createElement("fieldset"); fs.className="abcde-item";
+    fs.innerHTML = `<legend>${k} – ${title}</legend>
+      <div class="abcde-options">
+        <label><input type="radio" name="${k}" value="${opt1}" required> ${opt1}</label>
+        <label><input type="radio" name="${k}" value="${opt2}"> ${opt2}</label>
+      </div>`;
+    sec.appendChild(fs);
+  }
+}
+function summarizeABCDE(entry){
+  return ["A","B","C","D","E"].map(k=>k+": "+(entry.abcde?.[k]||entry.ABCDE?.[k]||"?")).join(" | ");
+}
+function toggleChangesBox(show){ document.getElementById("changesWrap").classList.toggle("hide", !show); }
+document.addEventListener("change",(e)=>{ if(e.target && e.target.name==="E"){ toggleChangesBox(isChangeValue(e.target.value)); }});
+
+// ===== Auth (Anonymous) =====
+async function ensureAuth(){
+  const note = document.getElementById("authState");
+  note.textContent = t().auth.connecting;
+  let { data:{ session } } = await supabase.auth.getSession();
+  if(!session){
+    const { data, error } = await supabase.auth.signInAnonymously();
+    if(error){ note.textContent = t().auth.err; console.error(error); return; }
+    session = data.session;
+  }
+  currentUser = session.user;
+  note.textContent = t().auth.ready + " • " + currentUser.id.slice(0,8);
+}
+supabase.auth.onAuthStateChange((_evt, session)=>{ if(session){ currentUser=session.user; } });
+
+// ===== Storage upload =====
+async function uploadImageIfAny(file, entryId){
+  if(!file) return {path:null, url:null};
+  const path = `${currentUser.id}/${entryId}-${Date.now()}.${(file.type.split("/")[1]||"jpg").toLowerCase()}`;
+  const { data, error } = await supabase.storage.from("lesion-photos").upload(path, file, { upsert:false, contentType:file.type });
+  if(error){ console.warn("storage upload error", error); return {path:null, url:null}; }
+  // bucket public=true → get public URL
+  const { data:pub } = supabase.storage.from("lesion-photos").getPublicUrl(path);
+  return { path, url: pub.publicUrl };
 }
 
-// ================= רשימה =================
-function renderList(){
-  const tr = t();
-  const list = document.getElementById("list");
-  const entries = loadEntries().sort((a,b)=> (b.createdAt||0)-(a.createdAt||0));
-  list.innerHTML = "";
-
-  if(entries.length===0){
-    list.innerHTML = `<p class="tiny">${tr.noRecords}</p>`;
-    return;
+// ===== DB ops =====
+async function fetchEntries(){
+  const { data, error } = await supabase
+    .from("entries")
+    .select("*")
+    .order("created_at", { ascending:false });
+  if(error){ console.error(error); return []; }
+  return data || [];
+}
+async function insertEntry(e){
+  const { data, error } = await supabase.from("entries").insert(e).select().single();
+  if(error){ console.error(error); return null; }
+  return data;
+}
+async function deleteEntryServer(id, image_path){
+  const { error } = await supabase.from("entries").delete().eq("id", id);
+  if(error){ alert("Delete failed"); return; }
+  if(image_path){
+    await supabase.storage.from("lesion-photos").remove([image_path]).catch(()=>{});
   }
+}
 
-  // בניית DOM + data-id למחיקה
+// ===== Render list =====
+async function renderList(){
+  const tr = t(); const list=document.getElementById("list");
+  const entries = await fetchEntries();
+  list.innerHTML = "";
+  if(entries.length===0){ list.innerHTML = `<p class="tiny">${tr.noRecords}</p>`; return; }
+
   for(const e of entries){
-    const div = document.createElement("div");
-    div.className = "entry";
-    div.dataset.id = e.id;
-
-    const h = document.createElement("h3");
-    h.textContent = `${e.date || ""}${e.title ? " – " + e.title : ""}`;
-    div.appendChild(h);
-
-    const badges = document.createElement("div");
-    badges.className = "badges";
-    badges.textContent = summarizeABCDE(e);
-    div.appendChild(badges);
-
-    if(e.notes){
-      const p = document.createElement("p");
-      p.textContent = `${tr.labels.notes}: ${e.notes}`;
-      div.appendChild(p);
-    }
-
-    if(e.changesText){
-      const p2 = document.createElement("p");
-      p2.textContent = `${tr.labels.changes}: ${e.changesText}`;
-      div.appendChild(p2);
-    }
-
-    const row = document.createElement("div");
-    row.className = "row";
-
-    if(e.image){
-      const a = document.createElement("a");
-      a.href = e.image;
-      a.target = "_blank";
-      a.rel = "noopener";
-      a.className = "link-btn";
-      a.textContent = tr.openImage;
-      row.appendChild(a);
-    }
-
-    row.appendChild(Object.assign(document.createElement("div"),{className:"spacer"}));
-
-    const delBtn = document.createElement("button");
-    delBtn.type = "button";
-    delBtn.className = "danger delete-btn";
-    delBtn.textContent = tr.delete;
-    row.appendChild(delBtn);
-
-    div.appendChild(row);
+    const div=document.createElement("div"); div.className="entry"; div.dataset.id=e.id;
+    const titleLine = [e.date || "", e.title || ""].filter(Boolean).join(" – ");
+    div.innerHTML = `
+      <h3>${escapeHtml(titleLine)}</h3>
+      <div class="badges">${escapeHtml(summarizeABCDE(e))}</div>
+      ${e.notes ? `<p>${tr.labels.notes}: ${escapeHtml(e.notes)}</p>` : ""}
+      ${e.changes_text ? `<p>${tr.labels.changes}: ${escapeHtml(e.changes_text)}</p>` : ""}
+      <div class="row">
+        ${e.image_url ? `<a class="link-btn" href="${e.image_url}" target="_blank" rel="noopener">${tr.openImage}</a>` : ""}
+        <div class="spacer"></div>
+        <button type="button" class="danger delete-btn">${tr.delete}</button>
+      </div>`;
+    // שמירת נתיב למחיקה
+    if(e.image_path){ div.dataset.path = e.image_path; }
     list.appendChild(div);
   }
 }
 
-// האזנת מחיקה מרוכזת (Event Delegation) – כך זה יעבוד תמיד
-document.getElementById("list").addEventListener("click", (ev)=>{
-  const tr = t();
-  const btn = ev.target.closest(".delete-btn");
-  if(!btn) return;
-  const card = ev.target.closest(".entry");
-  if(!card) return;
-  const id = card.dataset.id;
-  if(id && confirm(tr.confirmDelete)){ deleteEntry(id); }
-});
-
-// ================= ABCDE =================
-function getFormSelections(){
-  const sel = {};
-  ["A","B","C","D","E"].forEach(k=>{
-    const checked = document.querySelector(`#entryForm input[name="${k}"]:checked`);
-    if(checked) sel[k] = checked.value;
-  });
-  sel.date = document.getElementById("date").value;
-  sel.title = document.getElementById("title").value;
-  sel.notes = document.getElementById("notes").value;
-  sel.changesText = document.getElementById("changesText")?.value || "";
-  return sel;
-}
-
-function restoreFormSelections(sel){
-  document.getElementById("date").value = sel.date || new Date().toISOString().slice(0,10);
-  document.getElementById("title").value = sel.title || "";
-  document.getElementById("notes").value = sel.notes || "";
-  document.getElementById("changesText").value = sel.changesText || "";
-  toggleChangesBox(isChangeValue(sel.E));
-}
-
-function isChangeValue(v){
-  return v && (v === "יש שינוי" || v === "Есть изменения");
-}
-
-function buildABCDE(lang){
-  const tr = translations[lang];
-  const sec = document.getElementById("abcdeSection");
-  sec.innerHTML = "";
-
-  for(const k of ["A","B","C","D","E"]){
-    const [title,opt1,opt2] = tr.abcde[k];
-    const fs = document.createElement("fieldset");
-    fs.className = "abcde-item";
-
-    const lg = document.createElement("legend");
-    lg.textContent = `${k} – ${title}`;
-    fs.appendChild(lg);
-
-    const opts = document.createElement("div");
-    opts.className = "abcde-options";
-
-    const mk = (opt, req) => {
-      const label = document.createElement("label");
-      const r = document.createElement("input");
-      r.type = "radio"; r.name = k; r.value = opt; if(req) r.required = true;
-      label.appendChild(r); label.append(" " + opt);
-      return label;
-    };
-
-    opts.appendChild(mk(opt1, true));
-    opts.appendChild(mk(opt2, false));
-    fs.appendChild(opts);
-    sec.appendChild(fs);
-  }
-}
-
-// תיבת השינויים – נפתחת/נסגרת
-function toggleChangesBox(show){
-  document.getElementById("changesWrap").style.display = show ? "block" : "none";
-}
-
-// מאזין גלובלי לשינוי ב-E כדי שלא יתבטל לעולם
-document.addEventListener("change", (e)=>{
-  if(e.target && e.target.name === "E"){
-    toggleChangesBox(isChangeValue(e.target.value));
+// Delegation למחיקה
+document.getElementById("list").addEventListener("click", async (ev)=>{
+  const btn = ev.target.closest(".delete-btn"); if(!btn) return;
+  const card = ev.target.closest(".entry"); if(!card) return;
+  if(confirm(t().confirmDelete)){
+    await deleteEntryServer(card.dataset.id, card.dataset.path || null);
+    renderList();
   }
 });
 
-// ================= טופס =================
+// ===== Submit form =====
 document.getElementById("entryForm").addEventListener("submit", async (ev)=>{
   ev.preventDefault();
-  const form = ev.currentTarget;
-  const date = form.date.value || new Date().toISOString().slice(0,10);
-  const title = form.title.value.trim();
-  const notes = form.notes.value.trim();
+  if(!currentUser){ await ensureAuth(); if(!currentUser) return; }
+
+  const f = ev.currentTarget;
+  const date = f.date.value || new Date().toISOString().slice(0,10);
+  const title = f.title.value.trim();
+  const notes = f.notes.value.trim();
   const ABCDE = {};
   ["A","B","C","D","E"].forEach(k=>{
-    const v = form.querySelector(`input[name="${k}"]:checked`);
+    const v = f.querySelector(`input[name="${k}"]:checked`);
     if(v) ABCDE[k] = v.value;
   });
-
-  let changesText = "";
+  let changes_text = "";
   if(isChangeValue(ABCDE.E)){
-    changesText = (document.getElementById("changesText").value || "").trim();
+    changes_text = (document.getElementById("changesText").value || "").trim();
   }
 
-  let image = "";
-  if(form.photo.files && form.photo.files[0]){
-    try { image = await readFileAsDataURL(form.photo.files[0]); } catch(e){}
+  // העלאת תמונה (אם יש)
+  let imgPath=null, imgUrl=null;
+  const file = f.photo.files && f.photo.files[0] ? f.photo.files[0] : null;
+  const tempId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random());
+  if(file){
+    const up = await uploadImageIfAny(file, tempId);
+    imgPath = up.path; imgUrl = up.url;
   }
 
-  const entry = {
-    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
-    date, title, notes, ABCDE, changesText, image,
-    createdAt: Date.now()
+  const payload = {
+    id: tempId,
+    user_id: currentUser.id,
+    date,
+    title,
+    notes,
+    abcde: ABCDE,
+    changes_text,
+    image_path: imgPath,
+    image_url: imgUrl
   };
 
-  const entries = loadEntries();
-  entries.push(entry);
-  saveEntries(entries);
-
-  renderList();
-  form.reset();
-  buildABCDE(currentLang());
-  toggleChangesBox(false);
-  document.getElementById("date").value = new Date().toISOString().slice(0,10);
+  const saved = await insertEntry(payload);
+  if(saved){
+    f.reset();
+    buildABCDE(currentLang()); toggleChangesBox(false);
+    document.getElementById("date").value = new Date().toISOString().slice(0,10);
+    renderList();
+  }else{
+    alert("שמירה נכשלה");
+  }
 });
 
-// ================= ייבוא/איפוס =================
-document.getElementById("importBtn").addEventListener("click", ()=> document.getElementById("importFile").click());
-document.getElementById("importFile").addEventListener("change", async (e)=>{
-  const f = e.target.files[0]; if(!f) return;
-  try{
-    const txt = await f.text();
-    const arr = JSON.parse(txt);
-    if(Array.isArray(arr)){ saveEntries(arr); renderList(); }
-  }catch(err){ alert("Import failed"); }
-});
-
-document.getElementById("clearBtn").addEventListener("click", ()=>{
-  const tr = t();
-  if(confirm(tr.confirmDeleteAll)){ localStorage.removeItem(LS_KEY_ENTRIES); renderList(); }
-});
-
-// ================= ייצוא לדוק (Word) =================
-// יוצא קובץ .doc (HTML) שכל רשומה בעמוד משלה + תמונה מוקטנת (רוחב 400px)
-document.getElementById("exportDocBtn").addEventListener("click", ()=>{
-  const tr = t();
-  const entries = loadEntries().sort((a,b)=> (a.createdAt||0)-(b.createdAt||0)); // כרונולוגי
+// ===== Export DOC (Word) =====
+document.getElementById("exportDocBtn").addEventListener("click", async ()=>{
+  const tr = t(); const L = tr.labels;
+  const entries = (await fetchEntries()).sort((a,b)=> (a.created_at||"") > (b.created_at||"") ? 1 : -1);
   if(entries.length===0){ alert(tr.noRecords); return; }
 
-  const L = tr.labels;
   const dir = document.documentElement.dir || "rtl";
   const lang = document.documentElement.lang || "he";
 
-  let html = `<!DOCTYPE html>
-<html lang="${lang}" dir="${dir}">
-<head><meta charset="utf-8">
+  let html = `<!DOCTYPE html><html lang="${lang}" dir="${dir}"><head><meta charset="utf-8">
 <style>
   body{font-family:Arial,Helvetica,sans-serif;line-height:1.4}
   .page{page-break-after:always;margin:2cm;}
@@ -408,11 +297,11 @@ document.getElementById("exportDocBtn").addEventListener("click", ()=>{
 </style>
 </head><body>`;
 
-  entries.forEach((e, idx)=>{
-    const abcde = summarizeABCDE(e);
-    const imgTag = e.image ? `<img src="${e.image}" alt="image-${idx+1}">` : "";
+  for(const e of entries){
+    const abcde = summarizeABCDE({ abcde: e.abcde });
     const titleLine = [e.date || "", e.title || ""].filter(Boolean).join(" – ");
-    const changesLine = e.changesText ? `<div class="row"><span class="lbl">${L.changes}:</span> ${escapeHtml(e.changesText)}</div>` : "";
+    const imgTag = e.image_url ? `<img src="${e.image_url}" alt="image">` : "";
+    const changesLine = e.changes_text ? `<div class="row"><span class="lbl">${L.changes}:</span> ${escapeHtml(e.changes_text)}</div>` : "";
 
     html += `<div class="page">
   <h2>${escapeHtml(titleLine || (L.date + ": " + (e.date||"")))}</h2>
@@ -423,31 +312,18 @@ document.getElementById("exportDocBtn").addEventListener("click", ()=>{
   ${changesLine}
   ${imgTag}
 </div>`;
-  });
-
+  }
   html += `</body></html>`;
 
   const blob = new Blob(['\ufeff', html], {type:'application/msword;charset=utf-8'});
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "skin-entries.doc";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+  const a = document.createElement("a"); a.href=url; a.download="skin-entries.doc"; a.click();
   setTimeout(()=>URL.revokeObjectURL(url), 1000);
 });
 
-function escapeHtml(s){
-  return String(s||"").replace(/[&<>"]/g, ch =>
-    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch])
-  );
-}
-
-// ================= שפה =================
+// ===== UI: שפה + אתחול =====
 function applyLanguage(lang){
   const tr = translations[lang];
-
   document.documentElement.lang = (lang==="he") ? "he" : "ru";
   document.documentElement.dir  = (lang==="he") ? "rtl" : "ltr";
 
@@ -460,39 +336,43 @@ function applyLanguage(lang){
   document.getElementById("lblChangesText").textContent = tr.lblChangesText;
   document.getElementById("btnAdd").textContent   = tr.btnAdd;
   document.getElementById("exportDocBtn").textContent = tr.exportDoc;
-  document.getElementById("importBtn").textContent= tr.btnImport;
   document.getElementById("clearBtn").textContent = tr.btnClear;
   document.getElementById("myRecords").textContent= tr.myRecords;
 
-  const sel = getFormSelections();
+  const sel = {}; ["A","B","C","D","E"].forEach(k=>{
+    const checked = document.querySelector(`#entryForm input[name="${k}"]:checked`);
+    if(checked) sel[k]=checked.value;
+  });
   buildABCDE(lang);
-
-  // לשחזר בחירות רדיו בהתאם לערך, ולפתוח תיבת שינויים אם צריך
   ["A","B","C","D","E"].forEach(k=>{
     if(sel[k]){
-      const radios = Array.from(document.querySelectorAll(`#entryForm input[name="${k}"]`));
-      const match = radios.find(r => r.value === sel[k]);
-      if(match){ match.checked = true; }
+      const el = Array.from(document.querySelectorAll(`#entryForm input[name="${k}"]`)).find(r=>r.value===sel[k]);
+      if(el) el.checked = true;
     }
   });
-  restoreFormSelections(sel);
-
-  renderList();
 }
+document.getElementById("langSwitcher").addEventListener("change", e=> applyLanguage(e.target.value));
 
-document.getElementById("langSwitcher").addEventListener("change", e=>{
-  const lang = e.target.value;
-  localStorage.setItem(LS_KEY_LANG, lang);
-  applyLanguage(lang);
+// איפוס כל הרשומות (שרת)
+document.getElementById("clearBtn").addEventListener("click", async ()=>{
+  if(!currentUser){ await ensureAuth(); if(!currentUser) return; }
+  if(confirm(t().confirmDeleteAll)){
+    // נמחק כל הרשומות (RLS מגביל לרשומות של המשתמש בלבד)
+    const entries = await fetchEntries();
+    const paths = entries.map(e=>e.image_path).filter(Boolean);
+    await supabase.from("entries").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    if(paths.length){ await supabase.storage.from("lesion-photos").remove(paths).catch(()=>{}); }
+    renderList();
+  }
 });
 
-// ================= Init =================
-const savedLang = localStorage.getItem(LS_KEY_LANG) || "he";
-document.getElementById("langSwitcher").value = savedLang;
-buildABCDE(savedLang);
-applyLanguage(savedLang);
-document.getElementById("date").value = new Date().toISOString().slice(0,10);
-renderList();
+// init
+(async function init(){
+  applyLanguage("he"); // ברירת מחדל; תוכל/י לשנות תיכף בתפריט
+  document.getElementById("date").value = new Date().toISOString().slice(0,10);
+  await ensureAuth();
+  await renderList();
+})();
 </script>
 </body>
 </html>
