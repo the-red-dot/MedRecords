@@ -35,6 +35,7 @@
   .status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-inline-end:6px;background:#bbb}
   .status-ok{background:#29a745}
   .status-bad{background:#d33}
+  .summary-actions{margin-top:12px;display:flex;justify-content:flex-end}
 </style>
 </head>
 <body>
@@ -80,7 +81,6 @@
 
       <div class="actions">
         <button type="submit" class="primary" id="btnAdd">הוסף/י תיעוד</button>
-        <button type="button" class="secondary" id="exportDocBtn">ייצוא לדוק (Word)</button>
         <button type="button" class="secondary" id="clearBtn">איפוס הכל (שרת)</button>
       </div>
     </form>
@@ -89,6 +89,11 @@
   <section class="card">
     <h2 id="myRecords">הרשומות שלי</h2>
     <div id="list"></div>
+
+    <!-- כפתור הסיכום מתחת לרשומות -->
+    <div class="summary-actions">
+      <button type="button" class="secondary" id="summaryBtn">פתח/י דף סיכום</button>
+    </div>
   </section>
 </main>
 
@@ -109,24 +114,26 @@ const translations = {
   he:{ title:"מעקב נגעי עור – ABCDE",
     note:"המידע נשמר בחשבון Supabase שלך (עם כניסה אנונימית). התמונות נשמרות באחסון הענן שלך.",
     lblDate:"תאריך", lblTitle:"כותרת קצרה (אופציונלי)", lblNotes:"תיאור/תסמינים", lblPhoto:"תמונה (מומלץ)",
-    lblChangesText:"פרטי השינויים", btnAdd:"הוסף/י תיעוד", exportDoc:"ייצוא לדוק (Word)", btnClear:"איפוס הכל (שרת)",
+    lblChangesText:"פרטי השינויים", btnAdd:"הוסף/י תיעוד", btnClear:"איפוס הכל (שרת)",
     myRecords:"הרשומות שלי", openImage:"📷 פתח תמונה", delete:"מחיקה", confirmDelete:"למחוק את הרשומה?",
     confirmDeleteAll:"למחוק את כל הרשומות מהשרת?", noRecords:"אין רשומות.",
     authUi:{ signin:"כניסה אנונימית", signout:"התנתקות", connecting:"מתחבר...", ready:"מחובר (אנונימי)", off:"מנותק" },
     abcde:{ A:["אסימטריה","סימטרי","לא סימטרי"], B:["גבול","גבולות ברורים","גבול לא אחיד/משונן"],
             C:["צבע","צבע אחיד","מספר צבעים"], D:["קוטר","קטן מ-6 מ\"מ","גדול מ-6 מ\"מ"], E:["שינוי/התפתחות","ללא שינוי","יש שינוי"] },
-    labels:{ date:"תאריך", title:"כותרת", notes:"תיאור/תסמינים", abcde:"סיכום ABCDE", changes:"פרטי השינויים", image:"תמונה" }
+    labels:{ date:"תאריך", title:"כותרת", notes:"תיאור/תסמינים", abcde:"סיכום ABCDE", changes:"פרטי השינויים", image:"תמונה" },
+    summaryBtn:"פתח/י דף סיכום", summaryTitle:"סיכום רשומות", summaryNoData:"אין רשומות להצגה."
   },
   ru:{ title:"Мониторинг кожных поражений – ABCDE",
     note:"Данные сохраняются в вашем Supabase (анонимный вход). Фото в облачном хранилище.",
     lblDate:"Дата", lblTitle:"Краткий заголовок (опционально)", lblNotes:"Описание/симптомы", lblPhoto:"Фото (рекомендуется)",
-    lblChangesText:"Подробности изменений", btnAdd:"Добавить запись", exportDoc:"Экспорт в DOC (Word)", btnClear:"Очистить все (сервер)",
+    lblChangesText:"Подробности изменений", btnAdd:"Добавить запись", btnClear:"Очистить все (сервер)",
     myRecords:"Мои записи", openImage:"📷 Открыть фото", delete:"Удалить", confirmDelete:"Удалить запись?",
     confirmDeleteAll:"Удалить все записи на сервере?", noRecords:"Записей нет.",
     authUi:{ signin:"Анонимный вход", signout:"Выйти", connecting:"Подключение…", ready:"Подключено (анонимно)", off:"Отключено" },
     abcde:{ A:["Асимметрия","Симметричное","Асимметричное"], B:["Граница","Чёткая граница","Нечёткая/неровная"],
             C:["Цвет","Один цвет","Несколько цветов"], D:["Диаметр","Меньше 6 мм","Больше 6 мм"], E:["Эволюция","Без изменений","Есть изменения"] },
-    labels:{ date:"Дата", title:"Заголовок", notes:"Описание/симптомы", abcde:"Сводка ABCDE", changes:"Подробности изменений", image:"Фото" }
+    labels:{ date:"Дата", title:"Заголовок", notes:"Описание/симптомы", abcde:"Сводка ABCDE", changes:"Подробности изменений", image:"Фото" },
+    summaryBtn:"Открыть сводную страницу", summaryTitle:"Сводка записей", summaryNoData:"Нет записей для отображения."
   }
 };
 function currentLang(){ return document.getElementById("langSwitcher").value || "he"; }
@@ -158,7 +165,6 @@ document.addEventListener("change",(e)=>{ if(e.target && e.target.name==="E"){ t
 /* ================= Auth (Anonymous) ================= */
 async function updateAuthUi(state, info=""){
   const el = document.getElementById("authState");
-  const dot = el.querySelector(".status-dot");
   const btnIn = document.getElementById("btnAnonSignIn");
   const btnOut = document.getElementById("btnSignOut");
   if(state==="on"){
@@ -188,7 +194,7 @@ async function loadSession(){
 }
 document.getElementById("btnAnonSignIn").addEventListener("click", signInAnon);
 document.getElementById("btnSignOut").addEventListener("click", async ()=>{
-  await supabase.auth.signOut(); currentUser=null; await updateAuthUi("off"); document.getElementById("list").innerHTML=""; 
+  await supabase.auth.signOut(); currentUser=null; await updateAuthUi("off"); document.getElementById("list").innerHTML="";
 });
 
 /* ================= Storage upload ================= */
@@ -205,7 +211,7 @@ async function uploadImageIfAny(file, entryId){
 /* ================= DB ops ================= */
 async function fetchEntries(){
   if(!currentUser) return [];
-  const { data, error } = await supabase.from("entries").select("*").order("created_at",{ascending:false});
+  const { data, error } = await supabase.from("entries").select("*").order("date",{ascending:true}).order("created_at",{ascending:true});
   if(error){ console.error(error); return []; }
   return data || [];
 }
@@ -223,10 +229,20 @@ async function deleteEntryServer(id, image_path){
 /* ================= List render ================= */
 async function renderList(){
   const tr = t(); const list=document.getElementById("list");
-  if(!currentUser){ list.innerHTML = `<p class="tiny">${tr.authUi.off} – ${tr.authUi.signin || 'Sign in'}</p>`; return; }
+  const btnSummary = document.getElementById("summaryBtn");
+  if(!currentUser){ 
+    list.innerHTML = `<p class="tiny">${tr.authUi.off} – ${tr.authUi.signin || 'Sign in'}</p>`;
+    btnSummary.disabled = true;
+    return; 
+  }
   const entries = await fetchEntries();
   list.innerHTML = "";
-  if(entries.length===0){ list.innerHTML = `<p class="tiny">${tr.noRecords}</p>`; return; }
+  if(entries.length===0){ 
+    list.innerHTML = `<p class="tiny">${tr.noRecords}</p>`;
+    btnSummary.disabled = true;
+    return; 
+  }
+  btnSummary.disabled = false;
 
   for(const e of entries){
     const div=document.createElement("div"); div.className="entry"; div.dataset.id=e.id; if(e.image_path) div.dataset.path=e.image_path;
@@ -298,47 +314,63 @@ document.getElementById("entryForm").addEventListener("submit", async (ev)=>{
   }
 });
 
-/* ================= Export to DOC (Word) ================= */
-document.getElementById("exportDocBtn").addEventListener("click", async ()=>{
+/* ================= Summary page (opens new tab) ================= */
+document.getElementById("summaryBtn").addEventListener("click", async ()=>{
+  if(!currentUser){ await signInAnon(); if(!currentUser) return; }
   const tr = t(), L = tr.labels;
-  const entries = (await fetchEntries()).sort((a,b)=> (a.created_at||"") > (b.created_at||"") ? 1 : -1);
-  if(entries.length===0){ alert(tr.noRecords); return; }
+  const entries = await fetchEntries();
+  if(!entries.length){ alert(tr.summaryNoData); return; }
 
   const dir = document.documentElement.dir || "rtl";
   const lang = document.documentElement.lang || "he";
-  let html = `<!DOCTYPE html><html lang="${lang}" dir="${dir}"><head><meta charset="utf-8">
+  const w = window.open("", "_blank");
+  const safe = (s)=>escapeHtml(s);
+
+  // Build summary HTML (chronological by date)
+  let html = `<!DOCTYPE html><html lang="${lang}" dir="${dir}">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>${safe(tr.summaryTitle)}</title>
 <style>
-  body{font-family:Arial,Helvetica,sans-serif;line-height:1.4}
-  .page{page-break-after:always;margin:2cm;}
-  h2{margin:0 0 .4rem 0}
-  .row{margin:.2rem 0}
-  .lbl{font-weight:bold}
-  img{max-width:400px;height:auto;display:block;margin:.4rem 0;border:1px solid #ccc;padding:2px}
-  .mono{font-family:ui-monospace,Consolas,monospace}
-</style></head><body>`;
+  :root{ --fg:#111; --muted:#666; --border:#e6e8eb; --card:#fafbfc; }
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;background:#fff;color:var(--fg)}
+  header{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--border);padding:12px 16px;display:flex;gap:10px;align-items:center;z-index:5}
+  h1{font-size:1.1rem;margin:0}
+  main{padding:16px;max-width:900px;margin:auto}
+  .entry{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;margin:12px 0}
+  .entry h2{margin:.2rem 0;font-size:1rem}
+  .row{margin:.25rem 0}
+  .lbl{font-weight:600;color:#222}
+  .abcde{font-family:ui-monospace,Consolas,monospace;padding:.25rem .5rem;background:#fff;border:1px solid var(--border);border-radius:8px;display:inline-block}
+  img{max-width:100%;height:auto;display:block;margin:.5rem 0;border:1px solid var(--border);border-radius:10px}
+  .top-actions{margin-inline-start:auto;display:flex;gap:8px}
+  button{padding:8px 12px;border:1px solid var(--border);background:#f5f7fb;border-radius:8px;cursor:pointer}
+</style>
+</head><body>
+<header>
+  <h1>${safe(tr.summaryTitle)}</h1>
+  <div class="top-actions">
+    <button onclick="window.print()">${dir==='rtl'?'הדפסה/שיתוף':'Print/Share'}</button>
+    <button onclick="history.back()">${dir==='rtl'?'חזרה':'Back'}</button>
+  </div>
+</header>
+<main>`;
 
   for(const e of entries){
-    const abcde = summarizeABCDE({ abcde: e.abcde });
     const titleLine = [e.date || "", e.title || ""].filter(Boolean).join(" – ");
-    const imgTag = e.image_url ? `<img src="${e.image_url}" alt="image">` : "";
-    const changesLine = e.changes_text ? `<div class="row"><span class="lbl">${L.changes}:</span> ${escapeHtml(e.changes_text)}</div>` : "";
-
-    html += `<div class="page">
-  <h2>${escapeHtml(titleLine || (L.date + ": " + (e.date||"")))}</h2>
-  <div class="row"><span class="lbl">${L.date}:</span> ${escapeHtml(e.date||"")}</div>
-  <div class="row"><span class="lbl">${L.title}:</span> ${escapeHtml(e.title||"")}</div>
-  <div class="row"><span class="lbl">${L.notes}:</span> ${escapeHtml(e.notes||"")}</div>
-  <div class="row"><span class="lbl">${L.abcde}:</span> <span class="mono">${escapeHtml(abcde)}</span></div>
-  ${changesLine}
-  ${imgTag}
-</div>`;
+    const abcde = summarizeABCDE({ abcde: e.abcde });
+    html += `<article class="entry">
+      <h2>${safe(titleLine)}</h2>
+      <div class="row"><span class="lbl">${safe(L.date)}:</span> ${safe(e.date||"")}</div>
+      ${e.title ? `<div class="row"><span class="lbl">${safe(L.title)}:</span> ${safe(e.title)}</div>` : ""}
+      ${e.notes ? `<div class="row"><span class="lbl">${safe(L.notes)}:</span> ${safe(e.notes)}</div>` : ""}
+      <div class="row"><span class="lbl">${safe(L.abcde)}:</span> <span class="abcde">${safe(abcde)}</span></div>
+      ${e.changes_text ? `<div class="row"><span class="lbl">${safe(L.changes)}:</span> ${safe(e.changes_text)}</div>` : ""}
+      ${e.image_url ? `<img src="${e.image_url}" alt="photo">` : ""}
+    </article>`;
   }
-  html += `</body></html>`;
 
-  const blob = new Blob(['\ufeff', html], {type:'application/msword;charset=utf-8'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a"); a.href=url; a.download="skin-entries.doc"; a.click();
-  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+  html += `</main></body></html>`;
+  w.document.open(); w.document.write(html); w.document.close();
 });
 
 /* ================= Language + init ================= */
@@ -354,13 +386,13 @@ function applyLanguage(lang){
   document.getElementById("lblPhoto").textContent = tr.lblPhoto;
   document.getElementById("lblChangesText").textContent = tr.lblChangesText;
   document.getElementById("btnAdd").textContent   = tr.btnAdd;
-  document.getElementById("exportDocBtn").textContent = tr.exportDoc;
   document.getElementById("clearBtn").textContent = tr.btnClear;
   document.getElementById("myRecords").textContent= tr.myRecords;
   document.getElementById("btnAnonSignIn").textContent = tr.authUi.signin;
   document.getElementById("btnSignOut").textContent    = tr.authUi.signout;
+  document.getElementById("summaryBtn").textContent    = tr.summaryBtn;
 
-  // rebuild ABCDE (keep existing choices if any)
+  // rebuild ABCDE keeping selections
   const sel = {}; ["A","B","C","D","E"].forEach(k=>{
     const checked = document.querySelector(`#entryForm input[name="${k}"]:checked`);
     if(checked) sel[k]=checked.value;
@@ -377,9 +409,9 @@ function applyLanguage(lang){
 document.getElementById("langSwitcher").addEventListener("change", e=> applyLanguage(e.target.value));
 
 (async function init(){
-  applyLanguage("he"); // default (user can switch)
+  applyLanguage("he"); // default; user can switch
   document.getElementById("date").value = new Date().toISOString().slice(0,10);
-  await loadSession();   // if a session exists, we'll use it; otherwise show "Sign in" button
+  await loadSession();
   await renderList();
 })();
 </script>
